@@ -23,7 +23,6 @@ int main() {
       std::cin >> key;
       bool if_find = db.find(key);
       if (if_find) {
-        std::cout << "not null" << std::endl;
         sjtu::vector<int> res = db.find_all(key);
         for (int i = 0; i < res.size(); i++) {
           std::cout << res[i] << ' ';

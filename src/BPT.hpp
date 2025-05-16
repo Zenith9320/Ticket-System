@@ -15,7 +15,7 @@ using std::string;
 using std::fstream;
 using std::ios;
 
-const int SIZE = 100;
+const int SIZE = 3;
 const int STR_LEN = 100;
 
 /********************************************************************/
@@ -471,6 +471,7 @@ private:
   }
 
   void mergeNode(IndexNode& node) {
+    //std::cout << "merge" << std::endl;
     if (node.is_leaf) mergeLeaf(node);
     else mergeInt(node);
   }
@@ -582,7 +583,7 @@ public:
     return false;
   }
 
-  //查找所有key对应的value，并且存在一个Vector里  ！！！WARNING：实际上同一个key对应的键值对可能出现在不同块，因此要修改
+  //查找所有key对应的value，并且存在一个Vector里
   sjtu::vector<T> find_all(const Key& key) {
     //std::cout << "find_all" << key << std::endl;
     sjtu::map<T, T> res;
@@ -606,21 +607,58 @@ public:
         break;
       }
     }
+    IndexNode temp = readNode(cur.prev);
+    int temp_idx = temp.key_num - 1;
+    while (temp.keys[temp_idx] == key && temp_idx >= 0) {
+      T haha = readValue(cur.child_offset[temp_idx]);
+      res.insert({haha, haha});
+      temp_idx--;
+    }
     bool found = false;
-    while (true) {
-      for (int i = 0; i < cur.key_num; ++i) {
-        if (cur.keys[i] == key) {
-          T haha = readValue(cur.child_offset[i]);
-          res.insert({haha, haha});
-          found = true;
-        } else if (found && cur.keys[i] > key) {
-          break;
-        }
+    for (int i = 0; i < cur.key_num; ++i) {
+      if (cur.keys[i] == key) {
+        T haha = readValue(cur.child_offset[i]);
+        res.insert({haha, haha});
+        found = true;
+      } else if (found && cur.keys[i] > key) {
+        break;
       }
+    }
+    IndexNode temp_cur = cur;
+    while (true) {
       if (cur.next != -1) {
         IndexNode next_node = readNode(cur.next);
         if (next_node.key_num > 0 && next_node.keys[0] == key) {
           cur = next_node;
+          for (int i = 0; i < cur.key_num; ++i) {
+            if (cur.keys[i] == key) {
+              T haha = readValue(cur.child_offset[i]);
+              res.insert({haha, haha});
+            } else if (cur.keys[i] > key) {
+              break;
+            }
+          }
+        } else {
+          break;
+        }
+      } else {
+        break;
+      }
+    }
+    cur = temp_cur;
+    while (true) {
+      if (cur.prev != -1) {
+        IndexNode prev_node = readNode(cur.prev);
+        if (prev_node.key_num > 0 && prev_node.keys[prev_node.key_num - 1] == key) {
+          cur = prev_node;
+          for (int i = prev_node.key_num - 1; i >= 0; --i) {
+            if (prev_node.keys[i] == key) {
+              T haha = readValue(cur.child_offset[i]);
+              res.insert({haha, haha});
+            } else if (prev_node.keys[i] < key) {
+              break;
+            }
+          }
         } else {
           break;
         }
@@ -678,6 +716,34 @@ public:
         }
       }
     }
+    IndexNode temp_cur = cur;
+    while (ErasePos == -1 && cur.prev != -1) {
+      IndexNode prev_node = readNode(cur.prev);
+      for (int i = prev_node.key_num - 1; i >= 0; i--) {
+        if (prev_node.keys[i] == key) {
+          T temp = readValue(prev_node.child_offset[i]);
+          if (temp == value) {
+            ErasePos = i;
+            cur = prev_node;
+            break;
+          }
+        }
+      }
+    }
+    if (ErasePos == -1) cur = temp_cur;
+    while (ErasePos == -1 && cur.next != -1) {
+      IndexNode next_node = readNode(cur.next);
+      for (int i = 0; i < next_node.key_num; i++) {
+        if (next_node.keys[i] == key) {
+          T temp = readValue(next_node.child_offset[i]);
+          if (temp == value) {
+            ErasePos = i;
+            cur = next_node;
+            break;
+          }
+        }
+      }
+    }
     if (ErasePos == -1) {
       return false;
     }
@@ -685,37 +751,44 @@ public:
       cur.keys[i] = cur.keys[i + 1];
       cur.child_offset[i] = cur.child_offset[i + 1];
     }
+    cur.keys[cur.key_num - 1] = Key();
+    cur.child_offset[cur.key_num - 1] = -1;
     --cur.key_num;
     --basic_info.total_num;
+    if (cur.next != -1 && cur.key_num == 0) {
+      auto temp = readNode(cur.next);
+      temp.prev = cur.prev;
+      writeNode(temp);
+    }
+    if (cur.prev != -1 && cur.key_num == 0) {
+      auto temp = readNode(cur.prev);
+      temp.next = cur.next;
+      writeNode(temp);
+    }
     writeNode(cur);
     if (basic_info.total_num == 0) {
       basic_info.root = -1;
     }
     updateInfo();
-    if (ErasePos == 0 && cur.parent != -1) {
+    /*if (ErasePos == 0 && cur.parent != -1) {
       updateParentKey(cur.parent, cur.offset, cur.keys[0]);
-    }
-    if (cur.key_num <= SIZE / 3 && 
-      ((cur.next != -1 && readNode(cur.next).key_num <= SIZE / 3) 
-      || (cur.prev != -1 && readNode(cur.prev).key_num <= SIZE / 3))) {
+    }*/
+    
+    if (cur.key_num < (SIZE + 1) / 2) {
       mergeNode(cur);
     }
     return true;
   }
 
   void updateParentKey(int parent_offset, int child_offset, Key new_key) {
-    if (parent_offset == -1) return;
     IndexNode parent = readNode(parent_offset);
-    int idx = 0;
-    while (idx <= parent.key_num && parent.child_offset[idx] != child_offset) idx++;
-    if (idx > 0) {
-      IndexNode child = readNode(child_offset);
-      if (child.key_num > 0) {
-        parent.keys[idx - 1] = child.keys[0];
+    for (int i = 0; i < parent.key_num; ++i) {
+      if (parent.child_offset[i] == child_offset) {
+        parent.keys[i] = new_key;
+        break;
       }
-      writeNode(parent);
-      updateParentKey(parent.parent, parent.offset, new_key);
     }
+    writeNode(parent);
   }
 
   //清空整棵树
@@ -728,8 +801,8 @@ public:
 
   void print_tree() {
     if (basic_info.root == -1) {
-        std::cout << "[Empty Tree]" << std::endl;
-        return;
+      std::cout << "[Empty Tree]" << std::endl;
+      return;
     }
     print_node(basic_info.root, 0);
     print_leaves(); 
@@ -741,6 +814,7 @@ public:
     // 打印缩进和节点类型
     for (int i = 0; i < depth; ++i) std::cout << "│   ";
     std::cout << (node.is_leaf ? "├─ Leaf " : "├─ Int  ");
+    std::cout << "[key_num]: " << node.key_num << ",";
     
     // 打印键值
     std::cout << "[Offset:" << node.offset << "] Keys: ";
@@ -751,32 +825,29 @@ public:
     std::cout << std::endl;
 
     // 递归打印子节点（非叶子节点）
-    if (!node.is_leaf) {
-        for (int i = 0; i <= node.key_num; ++i) {
-            print_node(node.child_offset[i], depth + 1);
-        }
+    if (!node.is_leaf && node.key_num > 0) {
+      for (int i = 0; i <= node.key_num; ++i) {
+        int coff = node.child_offset[i];
+        if (coff != -1) print_node(node.child_offset[i], depth + 1);
+      }
     }
 }
 
 void print_leaves() {
   std::cout << "\nLeaf Linked List: ";
   if (basic_info.root == -1) return;
-  
-  // 找到最左叶子
   IndexNode cur = readNode(basic_info.root);
   while (!cur.is_leaf) {
       cur = readNode(cur.child_offset[0]);
   }
-  
-  // 遍历链表
   while (cur.offset != -1) {
-      std::cout << "(";
-      for (int i = 0; i < cur.key_num; ++i) {
-          std::cout << cur.keys[i];
-          if (i != cur.key_num - 1) std::cout << ",";
-      }
-      std::cout << ") -> ";
-      cur = (cur.next != -1) ? readNode(cur.next) : IndexNode();
+    std::cout << "(";
+    for (int i = 0; i < cur.key_num; ++i) {
+      std::cout << cur.keys[i];
+      if (i != cur.key_num - 1) std::cout << ",";
+    }
+    std::cout << ") -> ";
+    cur = (cur.next != -1) ? readNode(cur.next) : IndexNode();
   }
   std::cout << "END" << std::endl;
 }

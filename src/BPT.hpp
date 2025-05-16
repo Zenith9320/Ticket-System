@@ -15,7 +15,7 @@ using std::string;
 using std::fstream;
 using std::ios;
 
-const int SIZE = 1000;
+const int SIZE = 100;
 const int STR_LEN = 100;
 
 /********************************************************************/
@@ -719,6 +719,9 @@ public:
     IndexNode temp_cur = cur;
     while (ErasePos == -1 && cur.prev != -1) {
       IndexNode prev_node = readNode(cur.prev);
+      if (prev_node.keys[prev_node.key_num - 1] != key) {
+        break;
+      }
       for (int i = prev_node.key_num - 1; i >= 0; i--) {
         if (prev_node.keys[i] == key) {
           T temp = readValue(prev_node.child_offset[i]);
@@ -733,6 +736,9 @@ public:
     if (ErasePos == -1) cur = temp_cur;
     while (ErasePos == -1 && cur.next != -1) {
       IndexNode next_node = readNode(cur.next);
+      if (next_node.keys[0] != key) {
+        break;
+      }
       for (int i = 0; i < next_node.key_num; i++) {
         if (next_node.keys[i] == key) {
           T temp = readValue(next_node.child_offset[i]);
@@ -745,6 +751,7 @@ public:
       }
     }
     if (ErasePos == -1) {
+      //std::cout << "pair not found" << std::endl;
       return false;
     }
     for (int i = ErasePos; i < cur.key_num - 1; ++i) {

@@ -15,7 +15,7 @@ using std::string;
 using std::fstream;
 using std::ios;
 
-const int SIZE = 500;
+const int SIZE = 100;
 const int STR_LEN = 100;
 
 /********************************************************************/
@@ -236,7 +236,7 @@ private:
       //std::cout << "modify parent" << std::endl;
       IndexNode Parent = readNode(node.parent);
       int pos = 0;
-      while ((pos < Parent.key_num && Parent.keys[pos] < NewKey) || (Parent.keys[pos] == NewKey && Parent.keys[pos] == NewKey)) {
+      while ((pos < Parent.key_num && Parent.keys[pos] < NewKey) || (pos < Parent.key_num && .keys[pos] == NewKey && Parent.keys[pos] == NewKey)) {
         pos++;
       }
       for (int i = Parent.key_num; i > pos; --i) {

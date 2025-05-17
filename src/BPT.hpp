@@ -15,7 +15,7 @@ using std::string;
 using std::fstream;
 using std::ios;
 
-const int SIZE = 111;
+const int SIZE = 2;
 const int STR_LEN = 100;
 
 /********************************************************************/
@@ -234,8 +234,20 @@ private:
       //std::cout << "modify parent" << std::endl;
       IndexNode Parent = readNode(node.parent);
       int pos = 0;
-      while ((pos < Parent.key_num && Parent.keys[pos] < NewKey) || (pos < Parent.key_num && Parent.keys[pos] == NewKey && Parent.keys[pos] == NewKey)) {
+      while (pos < Parent.key_num && Parent.keys[pos] < NewKey) {
         pos++;
+      }
+      if (Parent.keys[pos] == NewKey) {
+        while (true) {
+          IndexNode temp = readNode(Parent.child_offset[pos]);
+          while (temp.is_leaf == false) {
+            temp = readNode(temp.child_offset[temp.key_num]);
+          }
+          if (temp.keys[temp.key_num - 1] != NewKey) {
+            break;
+          }
+          pos++;
+        }
       }
       for (int i = Parent.key_num; i > pos; --i) {
         Parent.keys[i] = Parent.keys[i - 1];
@@ -300,7 +312,19 @@ private:
     } else {
       IndexNode Parent = readNode(node.parent);
       int pos = 0;
-      while ((pos < Parent.key_num && Parent.keys[pos] < NewKey) || (pos < Parent.key_num && Parent.keys[pos] == NewKey && Parent.keys[pos] == NewKey)) ++pos;
+      while (pos < Parent.key_num && Parent.keys[pos] < NewKey) ++pos;
+      if (Parent.keys[pos] == NewKey) {
+        while (true) {
+          IndexNode temp = readNode(Parent.child_offset[pos]);
+          while (temp.is_leaf == false) {
+            temp = readNode(temp.child_offset[temp.key_num]);
+          }
+          if (temp.keys[temp.key_num - 1] != NewKey) {
+            break;
+          }
+          pos++;
+        }
+      }
       for (int i = Parent.key_num; i > pos; --i) {
         Parent.keys[i] = Parent.keys[i - 1];
         Parent.child_offset[i + 1] = Parent.child_offset[i];

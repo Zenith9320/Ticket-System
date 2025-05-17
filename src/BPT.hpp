@@ -192,7 +192,6 @@ private:
     IndexNode NewLeaf;
     NewLeaf.offset = basic_info.write_offset;
     basic_info.write_offset += sizeof(IndexNode);
-    updateInfo();
     NewLeaf.is_leaf = true;
     NewLeaf.parent = node.parent;
 
@@ -231,7 +230,6 @@ private:
       writeNode(NewRoot);
       writeNode(node);
       writeNode(NewLeaf);
-      updateInfo();
     } else {
       //std::cout << "modify parent" << std::endl;
       IndexNode Parent = readNode(node.parent);
@@ -252,12 +250,12 @@ private:
       if (Parent.key_num > SIZE) {
         splitNode(Parent);
       }
-      updateInfo();
       //for (int i = 0; i < Parent.key_num + 1; ++i) {
       //  std::cout << Parent.child_offset[i] << " ";
       //}
       //std::cout << std::endl;
     }
+    updateInfo();
   }
 
   void splitInt(IndexNode& node) {
@@ -265,7 +263,6 @@ private:
     IndexNode NewInt;
     NewInt.offset = basic_info.write_offset;
     basic_info.write_offset += sizeof(IndexNode);
-    updateInfo();
     NewInt.is_leaf = false;
     NewInt.parent = node.parent;
 
@@ -301,7 +298,6 @@ private:
       writeNode(node);
       writeNode(NewInt);
       writeNode(NewRoot);
-      updateInfo();
     } else {
       IndexNode Parent = readNode(node.parent);
       int pos = 0;
@@ -317,8 +313,8 @@ private:
       if (Parent.key_num > SIZE) {
         splitNode(Parent);
       }
-      updateInfo();
     }
+    updateInfo();
   }
 
   void splitNode(IndexNode& node) {
@@ -434,7 +430,6 @@ private:
         IndexNode child = readNode(node.child_offset[0]);
         child.parent = -1;
         writeNode(child);
-        updateInfo();
       }
       return;
     }
@@ -542,6 +537,7 @@ private:
         mergeNode(parent_node);
       }
     }
+    updateInfo();
   }
 
   void mergeNode(IndexNode& node) {

@@ -762,7 +762,7 @@ public:
       cur = next_node;
     }
     if (ErasePos == -1) {
-      std::cout << "pair not found" << std::endl;
+      //std::cout << "pair not found" << std::endl;
       return false;
     }
     for (int i = ErasePos; i < cur.key_num - 1; ++i) {

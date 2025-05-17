@@ -15,7 +15,7 @@ using std::string;
 using std::fstream;
 using std::ios;
 
-const int SIZE = 100;
+const int SIZE = 500;
 const int STR_LEN = 100;
 
 /********************************************************************/
@@ -83,9 +83,9 @@ struct IndexNode {                  //把每个节点的元信息包含在节点
   int parent;
   int prev;
   int next;
-  Key keys[SIZE + 1];               //存储键
+  Key keys[SIZE + 5];               //存储键
   size_t key_num;                   //存储已经有的键的数量
-  int child_offset[SIZE + 2];       //存储数据在文件中的偏移量
+  int child_offset[SIZE + 5];       //存储数据在文件中的偏移量
   int offset;                       //节点的偏移量
 
   IndexNode() : is_leaf(false), parent(-1), prev(-1), next(-1) {

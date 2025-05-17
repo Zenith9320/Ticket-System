@@ -188,6 +188,7 @@ private:
 
   /*****split操作*****/
   void splitLeaf(IndexNode& node) {
+    std::cout << "SplitLeaf" << std::endl;
     IndexNode NewLeaf;
     NewLeaf.offset = basic_info.write_offset;
     basic_info.write_offset += sizeof(IndexNode);
@@ -232,9 +233,10 @@ private:
       writeNode(NewLeaf);
       updateInfo();
     } else {
+      //std::cout << "modify parent" << std::endl;
       IndexNode Parent = readNode(node.parent);
       int pos = 0;
-      while (pos < Parent.key_num && Parent.keys[pos] < NewKey) {
+      while ((pos < Parent.key_num && Parent.keys[pos] < NewKey) || (Parent.keys[pos] == NewKey && Parent.keys[pos] == NewKey)) {
         pos++;
       }
       for (int i = Parent.key_num; i > pos; --i) {
@@ -243,16 +245,23 @@ private:
       }
       Parent.keys[pos] = NewKey;
       Parent.child_offset[pos + 1] = NewLeaf.offset;
+      //std::cout << "pos: " << pos << std::endl;
+      //std::cout << "Parent.child_offset[" << pos + 1 << "]: " << Parent.child_offset[pos + 1] << std::endl;
       Parent.key_num++;
       writeNode(Parent);
       if (Parent.key_num > SIZE) {
         splitNode(Parent);
       }
       updateInfo();
+      //for (int i = 0; i < Parent.key_num + 1; ++i) {
+      //  std::cout << Parent.child_offset[i] << " ";
+      //}
+      //std::cout << std::endl;
     }
   }
 
   void splitInt(IndexNode& node) {
+    //std::cout << "SplitInt" << std::endl;
     IndexNode NewInt;
     NewInt.offset = basic_info.write_offset;
     basic_info.write_offset += sizeof(IndexNode);

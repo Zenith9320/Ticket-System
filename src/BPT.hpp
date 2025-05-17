@@ -15,7 +15,7 @@ using std::string;
 using std::fstream;
 using std::ios;
 
-const int SIZE = 2;
+const int SIZE = 100;
 const int STR_LEN = 100;
 
 /********************************************************************/
@@ -189,6 +189,10 @@ private:
   /*****split操作*****/
   void splitLeaf(IndexNode& node) {
     //std::cout << "SplitLeaf" << std::endl;
+    //for (int i = 0; i < node.key_num; ++i) {
+    //  std::cout << node.keys[i] << " ";
+    //}
+    //std::cout << std::endl;
     IndexNode NewLeaf;
     NewLeaf.offset = basic_info.write_offset;
     basic_info.write_offset += sizeof(IndexNode);
@@ -234,20 +238,8 @@ private:
       //std::cout << "modify parent" << std::endl;
       IndexNode Parent = readNode(node.parent);
       int pos = 0;
-      while (pos < Parent.key_num && Parent.keys[pos] < NewKey) {
+      while (pos < Parent.key_num && (Parent.keys[pos] < NewKey || Parent.keys[pos] == NewKey)) {
         pos++;
-      }
-      if (Parent.keys[pos] == NewKey) {
-        while (true) {
-          IndexNode temp = readNode(Parent.child_offset[pos]);
-          while (temp.is_leaf == false) {
-            temp = readNode(temp.child_offset[temp.key_num]);
-          }
-          if (temp.keys[temp.key_num - 1] != NewKey) {
-            break;
-          }
-          pos++;
-        }
       }
       for (int i = Parent.key_num; i > pos; --i) {
         Parent.keys[i] = Parent.keys[i - 1];
@@ -312,19 +304,7 @@ private:
     } else {
       IndexNode Parent = readNode(node.parent);
       int pos = 0;
-      while (pos < Parent.key_num && Parent.keys[pos] < NewKey) ++pos;
-      if (Parent.keys[pos] == NewKey) {
-        while (true) {
-          IndexNode temp = readNode(Parent.child_offset[pos]);
-          while (temp.is_leaf == false) {
-            temp = readNode(temp.child_offset[temp.key_num]);
-          }
-          if (temp.keys[temp.key_num - 1] != NewKey) {
-            break;
-          }
-          pos++;
-        }
-      }
+      while (pos < Parent.key_num && (Parent.keys[pos] < NewKey || Parent.keys[pos] == NewKey)) ++pos;
       for (int i = Parent.key_num; i > pos; --i) {
         Parent.keys[i] = Parent.keys[i - 1];
         Parent.child_offset[i + 1] = Parent.child_offset[i];
@@ -657,8 +637,13 @@ public:
         while (i < cur.key_num && key >= cur.keys[i]) ++i;
         cur = readNode(cur.child_offset[i]);
       }
-      while (cur.keys[cur.key_num - 1] == key && cur.next != -1) {
-        cur = readNode(cur.next);
+      while (cur.keys[cur.key_num - 1] == key && cur.next != -1 && cur.key_num >= SIZE) {
+        auto temp_node = readNode(cur.next);
+        if (temp_node.key_num > 0 && temp_node.keys[0] == key) {
+          cur = temp_node;
+        } else {
+          break;
+        }
       }
       int pos = 0;
       while (pos < cur.key_num && cur.keys[pos] < key) ++pos;

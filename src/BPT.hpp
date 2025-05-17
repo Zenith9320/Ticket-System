@@ -188,7 +188,7 @@ private:
 
   /*****split操作*****/
   void splitLeaf(IndexNode& node) {
-    std::cout << "SplitLeaf" << std::endl;
+    //std::cout << "SplitLeaf" << std::endl;
     IndexNode NewLeaf;
     NewLeaf.offset = basic_info.write_offset;
     basic_info.write_offset += sizeof(IndexNode);

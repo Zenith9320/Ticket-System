@@ -721,10 +721,6 @@ public:
     cur = temp_cur;
     while (true) {
       if (cur.prev != -1) {
-        if (cur.key_num == 0) {
-          cur = readNode(cur.next); 
-          continue;
-        }
         IndexNode prev_node = readNode(cur.prev);
         if (prev_node.key_num > 0 && prev_node.keys[prev_node.key_num - 1] == key) {
           cur = prev_node;

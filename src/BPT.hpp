@@ -1,6 +1,5 @@
 #ifndef BPT_HPP
 #define BPT_HPP
-#include <iostream>
 #include <cstdio>
 #include <cmath>
 #include <string>
@@ -15,7 +14,7 @@ using std::string;
 using std::fstream;
 using std::ios;
 
-const int SIZE = 100;
+const int SIZE = 150;
 const int STR_LEN = 100;
 
 /********************************************************************/
@@ -722,6 +721,10 @@ public:
     cur = temp_cur;
     while (true) {
       if (cur.prev != -1) {
+        if (cur.key_num == 0) {
+          cur = readNode(cur.next); 
+          continue;
+        }
         IndexNode prev_node = readNode(cur.prev);
         if (prev_node.key_num > 0 && prev_node.keys[prev_node.key_num - 1] == key) {
           cur = prev_node;

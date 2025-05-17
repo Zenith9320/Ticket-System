@@ -89,10 +89,10 @@ struct IndexNode {                  //把每个节点的元信息包含在节点
   int offset;                       //节点的偏移量
 
   IndexNode() : is_leaf(false), parent(-1), prev(-1), next(-1) {
-    for (int i = 0; i < SIZE + 1; i++) {
+    for (int i = 0; i < SIZE + 5; i++) {
       keys[i] = Key();
     }
-    for (int i = 0; i <= SIZE + 1; i++) {
+    for (int i = 0; i <= SIZE + 4; i++) {
       child_offset[i] = -1;
     }
     offset = -1;
@@ -100,10 +100,10 @@ struct IndexNode {                  //把每个节点的元信息包含在节点
   };
   IndexNode(bool _is_leaf, int _parent, int _prev, int _next, size_t _key_num, int _offset) :
   is_leaf(_is_leaf), parent(_parent), prev(_prev), next(_next), key_num(_key_num), offset(_offset) {
-    for (int i = 0; i < SIZE + 1; i++) {
+    for (int i = 0; i < SIZE + 5; i++) {
       keys[i] = Key();
     }
-    for (int i = 0; i <= SIZE + 1; i++) {
+    for (int i = 0; i <= SIZE + 4; i++) {
       child_offset[i] = -1;
     }
   };
@@ -727,6 +727,7 @@ public:
     }
     IndexNode temp_cur = cur;
     while (ErasePos == -1 && cur.prev != -1) {
+      //std::cout << 1 << std::endl;
       IndexNode prev_node = readNode(cur.prev);
       if (!(prev_node.keys[prev_node.key_num - 1] == key)) {
         break;
@@ -736,14 +737,15 @@ public:
           T temp = readValue(prev_node.child_offset[i]);
           if (temp == value) {
             ErasePos = i;
-            cur = prev_node;
             break;
           }
         }
       }
+      cur = prev_node;
     }
     if (ErasePos == -1) cur = temp_cur;
     while (ErasePos == -1 && cur.next != -1) {
+      //std::cout << 2 << std::endl;
       IndexNode next_node = readNode(cur.next);
       if (!(next_node.keys[0] == key)) {
         break;
@@ -753,14 +755,14 @@ public:
           T temp = readValue(next_node.child_offset[i]);
           if (temp == value) {
             ErasePos = i;
-            cur = next_node;
             break;
           }
         }
       }
+      cur = next_node;
     }
     if (ErasePos == -1) {
-      //std::cout << "pair not found" << std::endl;
+      std::cout << "pair not found" << std::endl;
       return false;
     }
     for (int i = ErasePos; i < cur.key_num - 1; ++i) {

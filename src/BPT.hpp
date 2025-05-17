@@ -15,8 +15,8 @@ using std::string;
 using std::fstream;
 using std::ios;
 
-const int SIZE = 500;
-const int STR_LEN = 100;
+const int SIZE = 100;
+const int STR_LEN = 65;
 
 /********************************************************************/
 //若干结构体
@@ -927,9 +927,9 @@ public:
       updateParentKey(cur.parent, cur.offset, cur.keys[0]);
     }*/
     
-    if (cur.key_num > 0 && cur.key_num < (SIZE + 1) / 2) {
-      mergeNode(cur);
-    }
+    //if (cur.key_num > 0 && cur.key_num < (SIZE + 1) / 2) {
+    //  mergeNode(cur);
+    //}
     return true;
   }
 

@@ -15,7 +15,7 @@ using std::string;
 using std::fstream;
 using std::ios;
 
-const int SIZE = 66;
+const int SIZE = 120;
 const int STR_LEN = 100;
 
 /********************************************************************/
@@ -393,6 +393,16 @@ private:
       parent_node.key_num--;
       writeNode(left_sibling);
       writeNode(parent_node);
+      node.key_num = 0;
+      node.offset = -1;
+      node.parent = -1;
+      node.prev = -1;
+      node.next = -1;
+      for (int i = 0; i < SIZE + 5; ++i) {
+          node.keys[i] = Key();
+          node.child_offset[i] = -1;
+      }
+      writeNode(node);
       if (parent_node.key_num < (SIZE + 1) / 2) {
         mergeNode(parent_node);
       }
@@ -417,6 +427,16 @@ private:
       parent_node.key_num--;
       writeNode(node);
       writeNode(parent_node);
+      right_sibling.key_num = 0;
+      right_sibling.offset = -1;
+      right_sibling.parent = -1;
+      right_sibling.prev = -1;
+      right_sibling.next = -1;
+      for (int i = 0; i < SIZE + 5; ++i) {
+          right_sibling.keys[i] = Key();
+          right_sibling.child_offset[i] = -1;
+      }
+      writeNode(right_sibling);
       if (parent_node.key_num < (SIZE + 1) / 2) {
         mergeNode(parent_node);
       }
@@ -508,6 +528,16 @@ private:
       parent_node.key_num--;
       writeNode(left_sibling);
       writeNode(parent_node);
+      node.key_num = 0;
+      node.offset = -1;
+      node.parent = -1;
+      node.prev = -1;
+      node.next = -1;
+      for (int i = 0; i < SIZE + 5; ++i) {
+          node.keys[i] = Key();
+          node.child_offset[i] = -1;
+      }
+      writeNode(node);
       if (parent_node.key_num < (SIZE + 1) / 2) {
         mergeNode(parent_node);
       }
@@ -533,6 +563,16 @@ private:
       parent_node.key_num--;
       writeNode(node);
       writeNode(parent_node);
+      right_sibling.key_num = 0;
+      right_sibling.offset = -1;
+      right_sibling.parent = -1;
+      right_sibling.prev = -1;
+      right_sibling.next = -1;
+      for (int i = 0; i < SIZE + 5; ++i) {
+          right_sibling.keys[i] = Key();
+          right_sibling.child_offset[i] = -1;
+      }
+      writeNode(right_sibling);
       if (parent_node.key_num < (SIZE + 1) / 2) {
         mergeNode(parent_node);
       }
@@ -677,12 +717,14 @@ public:
         break;
       }
     }
-    IndexNode temp = readNode(cur.prev);
-    int temp_idx = temp.key_num - 1;
-    while (temp.keys[temp_idx] == key && temp_idx >= 0) {
-      T haha = readValue(cur.child_offset[temp_idx]);
-      res.insert({haha, haha});
-      temp_idx--;
+    if (cur.prev != -1) {
+      IndexNode temp = readNode(cur.prev);
+      int temp_idx = temp.key_num - 1;
+      while (temp.keys[temp_idx] == key && temp_idx >= 0) {
+        T haha = readValue(cur.child_offset[temp_idx]);
+        res.insert({haha, haha});
+        temp_idx--;
+      }
     }
     bool found = false;
     for (int i = 0; i < cur.key_num; ++i) {
@@ -872,7 +914,7 @@ public:
       updateParentKey(cur.parent, cur.offset, cur.keys[0]);
     }*/
     
-    if (cur.key_num < (SIZE + 1) / 2) {
+    if (cur.key_num > 0 && cur.key_num < (SIZE + 1) / 2) {
       mergeNode(cur);
     }
     return true;

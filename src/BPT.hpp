@@ -1,5 +1,6 @@
 #ifndef BPT_HPP
 #define BPT_HPP
+#include <iostream>
 #include <cstdio>
 #include <cmath>
 #include <string>
@@ -14,7 +15,7 @@ using std::string;
 using std::fstream;
 using std::ios;
 
-const int SIZE = 150;
+const int SIZE = 125;
 const int STR_LEN = 100;
 
 /********************************************************************/

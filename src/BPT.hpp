@@ -729,6 +729,12 @@ public:
     while (ErasePos == -1 && cur.prev != -1) {
       //std::cout << 1 << std::endl;
       IndexNode prev_node = readNode(cur.prev);
+      if (prev_node.key_num == 0) {
+        break;
+      }
+      if (prev_node.is_leaf == false) {
+        break;
+      }
       if (!(prev_node.keys[prev_node.key_num - 1] == key)) {
         break;
       }
@@ -747,6 +753,9 @@ public:
     while (ErasePos == -1 && cur.next != -1) {
       //std::cout << 2 << std::endl;
       IndexNode next_node = readNode(cur.next);
+      if (next_node.key_num == 0) {
+        break;
+      }
       if (!(next_node.keys[0] == key)) {
         break;
       }
@@ -769,10 +778,15 @@ public:
       cur.keys[i] = cur.keys[i + 1];
       cur.child_offset[i] = cur.child_offset[i + 1];
     }
-    cur.keys[cur.key_num - 1] = Key();
-    cur.child_offset[cur.key_num - 1] = -1;
+    if (cur.key_num != 0) {
+      cur.keys[cur.key_num - 1] = Key();
+      cur.child_offset[cur.key_num - 1] = -1;
+    }
     --cur.key_num;
     --basic_info.total_num;
+    if (cur.key_num == 0) {
+      cur.key_num = 0;
+    }
     if (cur.next != -1 && cur.key_num == 0) {
       auto temp = readNode(cur.next);
       temp.prev = cur.prev;
@@ -782,6 +796,11 @@ public:
       auto temp = readNode(cur.prev);
       temp.next = cur.next;
       writeNode(temp);
+    }
+    if (cur.key_num == 0) {
+      cur.prev = -1;
+      cur.next = -1;
+      cur.parent = -1;
     }
     writeNode(cur);
     if (basic_info.total_num == 0) {

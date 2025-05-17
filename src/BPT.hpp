@@ -338,28 +338,56 @@ private:
       }
     }
     if (index == -1) return;
-    IndexNode sibling;
-    bool left = false;
     if (index > 0) {
-      sibling = readNode(parent_node.child_offset[index - 1]);
-      left = true;
-    } else if (index < parent_node.key_num) {
-      sibling = readNode(parent_node.child_offset[index + 1]);
-    } else {
-      return;
-    }
-
-    if (left) {
-      int start = sibling.key_num;
-      for (int i = 0; i < node.key_num; ++i) {
-        sibling.child_offset[start + i] = node.child_offset[i];
-        sibling.keys[start + i] = node.keys[i];
+      IndexNode left_sibling = readNode(parent_node.child_offset[index - 1]);
+      if (left_sibling.key_num > (SIZE + 1) / 2) {
+        // 借位
+        for (int i = node.key_num; i > 0; --i) {
+          node.keys[i] = node.keys[i - 1];
+          node.child_offset[i] = node.child_offset[i - 1];
+        }
+        node.keys[0] = left_sibling.keys[left_sibling.key_num - 1];
+        node.child_offset[0] = left_sibling.child_offset[left_sibling.key_num - 1];
+        node.key_num++;
+        left_sibling.key_num--;
+        parent_node.keys[index - 1] = node.keys[0];
+        writeNode(left_sibling);
+        writeNode(node);
+        writeNode(parent_node);
+        return;
       }
-      sibling.key_num += node.key_num;
-      sibling.next = node.next;
+    }
+    if (index < parent_node.key_num) {
+      IndexNode right_sibling = readNode(parent_node.child_offset[index + 1]);
+      if (right_sibling.key_num > (SIZE + 1) / 2) {
+        // 借位
+        node.keys[node.key_num] = right_sibling.keys[0];
+        node.child_offset[node.key_num] = right_sibling.child_offset[0];
+        node.key_num++;
+        for (int i = 0; i < right_sibling.key_num - 1; ++i) {
+          right_sibling.keys[i] = right_sibling.keys[i + 1];
+          right_sibling.child_offset[i] = right_sibling.child_offset[i + 1];
+        }
+        right_sibling.key_num--;
+        parent_node.keys[index] = right_sibling.keys[0];
+        writeNode(right_sibling);
+        writeNode(node);
+        writeNode(parent_node);
+        return;
+      }
+    }
+    if (index > 0) {
+      IndexNode left_sibling = readNode(parent_node.child_offset[index - 1]);
+      int start = left_sibling.key_num;
+      for (int i = 0; i < node.key_num; ++i) {
+        left_sibling.keys[start + i] = node.keys[i];
+        left_sibling.child_offset[start + i] = node.child_offset[i];
+      }
+      left_sibling.key_num += node.key_num;
+      left_sibling.next = node.next;
       if (node.next != -1) {
         IndexNode nextleaf = readNode(node.next);
-        nextleaf.prev = sibling.offset;
+        nextleaf.prev = left_sibling.offset;
         writeNode(nextleaf);
       }
       for (int i = index; i < parent_node.key_num; ++i) {
@@ -367,34 +395,35 @@ private:
         parent_node.child_offset[i] = parent_node.child_offset[i + 1];
       }
       parent_node.key_num--;
-      writeNode(sibling);
+      writeNode(left_sibling);
       writeNode(parent_node);
-    } else {
+      if (parent_node.key_num < (SIZE + 1) / 2) {
+        mergeNode(parent_node);
+      }
+    } else if (index < parent_node.key_num) {
+      IndexNode right_sibling = readNode(parent_node.child_offset[index + 1]);
       int start = node.key_num;
-      for (int i = 0; i < sibling.key_num; ++i) {
-        node.keys[start + i] = sibling.keys[i];
-        node.child_offset[start + i] = sibling.child_offset[i];
+      for (int i = 0; i < right_sibling.key_num; ++i) {
+        node.keys[start + i] = right_sibling.keys[i];
+        node.child_offset[start + i] = right_sibling.child_offset[i];
       }
-      node.key_num += sibling.key_num;
-      node.next = sibling.next;
-      if (sibling.next != -1) {
-        IndexNode next_leaf = readNode(sibling.next);
-        next_leaf.prev = node.offset;
-        writeNode(next_leaf);
+      node.key_num += right_sibling.key_num;
+      node.next = right_sibling.next;
+      if (right_sibling.next != -1) {
+        IndexNode nextleaf = readNode(right_sibling.next);
+        nextleaf.prev = node.offset;
+        writeNode(nextleaf);
       }
-
-      int sib_index = index + 1;
-      for (int i = sib_index; i < parent_node.key_num; ++i) {
+      for (int i = index + 1; i < parent_node.key_num; ++i) {
         parent_node.keys[i - 1] = parent_node.keys[i];
         parent_node.child_offset[i] = parent_node.child_offset[i + 1];
       }
       parent_node.key_num--;
       writeNode(node);
       writeNode(parent_node);
-    }
-
-    if (parent_node.key_num < SIZE / 3) {
-      mergeNode(parent_node);
+      if (parent_node.key_num < (SIZE + 1) / 2) {
+        mergeNode(parent_node);
+      }
     }
   }
 
@@ -418,64 +447,100 @@ private:
       }
     }
     if (index == -1) return;
-    IndexNode sibling;
-    bool left = false;
     if (index > 0) {
-      sibling = readNode(parent_node.child_offset[index - 1]);
-      left = true;
-    } else if (index < parent_node.key_num) {
-      sibling = readNode(parent_node.child_offset[index + 1]);
-    } else {
-      return;
-    }
-
-    if (left) {
-      int start = sibling.key_num;
-      sibling.keys[start] = parent_node.keys[index - 1];
-      sibling.key_num++;
-      for (int i = 0; i < node.key_num; ++i) {
-        sibling.keys[sibling.key_num + i] = node.keys[i];
+      IndexNode left_sibling = readNode(parent_node.child_offset[index - 1]);
+      if (left_sibling.key_num > (SIZE + 1) / 2) {
+        for (int i = node.key_num; i > 0; --i) {
+          node.keys[i] = node.keys[i - 1];
+          node.child_offset[i + 1] = node.child_offset[i];
+        }
+        node.child_offset[1] = node.child_offset[0];
+        node.keys[0] = parent_node.keys[index - 1];
+        node.child_offset[0] = left_sibling.child_offset[left_sibling.key_num];
+        parent_node.keys[index - 1] = left_sibling.keys[left_sibling.key_num - 1];
+        node.key_num++;
+        left_sibling.key_num--;
+        IndexNode child = readNode(node.child_offset[0]);
+        child.parent = node.offset;
+        writeNode(child);
+        writeNode(left_sibling);
+        writeNode(node);
+        writeNode(parent_node);
+        return;
       }
-      for (int i = 0; i < node.key_num + 1; ++i) {
-        sibling.child_offset[sibling.key_num + i - 1] = node.child_offset[i];
+    }
+    if (index < parent_node.key_num) {
+      IndexNode right_sibling = readNode(parent_node.child_offset[index + 1]);
+      if (right_sibling.key_num > (SIZE + 1) / 2) {
+        node.keys[node.key_num] = parent_node.keys[index];
+        node.child_offset[node.key_num + 1] = right_sibling.child_offset[0];
+        parent_node.keys[index] = right_sibling.keys[0];
+        node.key_num++;
+        for (int i = 0; i < right_sibling.key_num - 1; ++i) {
+          right_sibling.keys[i] = right_sibling.keys[i + 1];
+          right_sibling.child_offset[i] = right_sibling.child_offset[i + 1];
+        }
+        right_sibling.child_offset[right_sibling.key_num - 1] = right_sibling.child_offset[right_sibling.key_num];
+        right_sibling.key_num--;
+        IndexNode child = readNode(node.child_offset[node.key_num]);
+        child.parent = node.offset;
+        writeNode(child);
+        writeNode(right_sibling);
+        writeNode(node);
+        writeNode(parent_node);
+        return;
+      }
+    }
+    if (index > 0) {
+      IndexNode left_sibling = readNode(parent_node.child_offset[index - 1]);
+      int start = left_sibling.key_num;
+      left_sibling.keys[start] = parent_node.keys[index - 1];
+      left_sibling.key_num++;
+      for (int i = 0; i < node.key_num; ++i) {
+        left_sibling.keys[left_sibling.key_num + i] = node.keys[i];
+      }
+      for (int i = 0; i <= node.key_num; ++i) {
+        left_sibling.child_offset[left_sibling.key_num + i] = node.child_offset[i];
         IndexNode child = readNode(node.child_offset[i]);
-        child.parent = sibling.offset;
+        child.parent = left_sibling.offset;
         writeNode(child);
       }
-      sibling.key_num += node.key_num;
+      left_sibling.key_num += node.key_num;
       for (int i = index; i < parent_node.key_num; ++i) {
         parent_node.keys[i - 1] = parent_node.keys[i];
         parent_node.child_offset[i] = parent_node.child_offset[i + 1];
       }
       parent_node.key_num--;
-      writeNode(sibling);
+      writeNode(left_sibling);
       writeNode(parent_node);
-    } else {
+      if (parent_node.key_num < (SIZE + 1) / 2) {
+        mergeNode(parent_node);
+      }
+    } else if (index < parent_node.key_num) {
+      IndexNode right_sibling = readNode(parent_node.child_offset[index + 1]);
       int start = node.key_num;
       node.keys[start] = parent_node.keys[index];
       node.key_num++;
-      for (int i = 0; i < sibling.key_num; ++i) {
-        node.keys[node.key_num + i] = sibling.keys[i];
+      for (int i = 0; i < right_sibling.key_num; ++i) {
+        node.keys[node.key_num + i] = right_sibling.keys[i];
       }
-      for (int i = 0; i < sibling.key_num + 1; ++i) {
-        node.child_offset[node.key_num + i - 1] = sibling.child_offset[i];
-        IndexNode child = readNode(sibling.child_offset[i]);
+      for (int i = 0; i <= right_sibling.key_num; ++i) {
+        node.child_offset[node.key_num + i] = right_sibling.child_offset[i];
+        IndexNode child = readNode(right_sibling.child_offset[i]);
         child.parent = node.offset;
         writeNode(child);
       }
-      node.key_num += sibling.key_num;
-      int sib_index = index + 1;
-      for (int i = sib_index; i < parent_node.key_num; ++i) {
+      node.key_num += right_sibling.key_num;
+      for (int i = index + 1; i < parent_node.key_num; ++i) {
         parent_node.keys[i - 1] = parent_node.keys[i];
         parent_node.child_offset[i] = parent_node.child_offset[i + 1];
       }
       parent_node.key_num--;
       writeNode(node);
       writeNode(parent_node);
-    }
-
-    if (parent_node.key_num < SIZE / 3) {
-      mergeNode(parent_node);
+      if (parent_node.key_num < (SIZE + 1) / 2) {
+        mergeNode(parent_node);
+      }
     }
   }
 

@@ -280,8 +280,7 @@ private:
     }
 
     node.key_num = SplitPos;
-    writeNode(node);
-    writeNode(NewInt);
+    Key NewKey = NewInt.keys[0];
 
     if (node.parent == -1) {
       IndexNode NewRoot;
@@ -301,7 +300,7 @@ private:
     } else {
       IndexNode Parent = readNode(node.parent);
       int pos = 0;
-      while (pos < Parent.key_num && Parent.keys[pos] < temp_key) ++pos;
+      while ((pos < Parent.key_num && Parent.keys[pos] < NewKey) || (pos < Parent.key_num && Parent.keys[pos] == NewKey && Parent.keys[pos] == NewKey)) ++pos;
       for (int i = Parent.key_num; i > pos; --i) {
         Parent.keys[i] = Parent.keys[i - 1];
         Parent.child_offset[i + 1] = Parent.child_offset[i];
@@ -310,6 +309,8 @@ private:
       Parent.child_offset[pos + 1] = NewInt.offset;
       Parent.key_num++;
       writeNode(Parent);
+      writeNode(node);
+      writeNode(NewInt);
       if (Parent.key_num > SIZE) {
         splitNode(Parent);
       }
@@ -445,7 +446,7 @@ private:
 
   void mergeInt(IndexNode& node) {
     if (node.parent == -1) {
-      if (node.key_num == 0) {
+      if (node.key_num == 0 && node.child_offset[0] != -1) {
         basic_info.root = node.child_offset[0];
         IndexNode child = readNode(node.child_offset[0]);
         child.parent = -1;
@@ -631,6 +632,9 @@ public:
         int i = 0;
         while (i < cur.key_num && key >= cur.keys[i]) ++i;
         cur = readNode(cur.child_offset[i]);
+      }
+      while (cur.keys[cur.key_num - 1] == key && cur.next != -1) {
+        cur = readNode(cur.next);
       }
       int pos = 0;
       while (pos < cur.key_num && cur.keys[pos] < key) ++pos;

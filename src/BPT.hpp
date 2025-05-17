@@ -15,7 +15,7 @@ using std::string;
 using std::fstream;
 using std::ios;
 
-const int SIZE = 88;
+const int SIZE = 111;
 const int STR_LEN = 100;
 
 /********************************************************************/
@@ -978,7 +978,7 @@ void print_leaves() {
   if (basic_info.root == -1) return;
   IndexNode cur = readNode(basic_info.root);
   while (!cur.is_leaf) {
-      cur = readNode(cur.child_offset[0]);
+    cur = readNode(cur.child_offset[0]);
   }
   while (cur.offset != -1) {
     std::cout << "(";

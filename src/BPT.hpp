@@ -239,7 +239,10 @@ private:
       IndexNode Parent = readNode(node.parent);
       int pos = 0;
       while (pos < Parent.key_num && (Parent.keys[pos] < NewKey)) {
-        
+        ++pos;
+      }
+      //std::cout << "pos: " << pos << std::endl;
+      while (readNode(Parent.child_offset[pos]).keys[readNode(Parent.child_offset[pos]).key_num - 1] == NewKey && pos < Parent.key_num) {
         ++pos;
       }
       //std::cout << "pos: " << pos << std::endl;

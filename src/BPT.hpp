@@ -15,7 +15,7 @@ using std::string;
 using std::fstream;
 using std::ios;
 
-const int SIZE = 89;
+const int SIZE = 100;
 const int STR_LEN = 65;
 
 /********************************************************************/
@@ -239,8 +239,24 @@ private:
       IndexNode Parent = readNode(node.parent);
       int pos = 0;
       while (pos < Parent.key_num && (Parent.keys[pos] < NewKey || Parent.keys[pos] == NewKey)) {
-        pos++;
+        auto temp = readNode(Parent.child_offset[pos + 1]);
+        //for (int i = 0; i < temp.key_num; ++i) {
+        //  std::cout << temp.keys[i] << " ";
+        //} 
+        if (Parent.keys[pos] == NewKey) {
+          while (!temp.is_leaf) {
+            temp = readNode(temp.child_offset[temp.key_num]);
+            if (!(temp.keys[temp.key_num - 1] == NewKey)) {
+              break;
+            }
+          }
+          if (!(temp.keys[temp.key_num - 1] == NewKey)) {
+            break;
+          }
+        }
+        ++pos;
       }
+      //std::cout << "pos: " << pos << std::endl;
       for (int i = Parent.key_num; i > pos; --i) {
         Parent.keys[i] = Parent.keys[i - 1];
         Parent.child_offset[i + 1] = Parent.child_offset[i];
@@ -304,7 +320,24 @@ private:
     } else {
       IndexNode Parent = readNode(node.parent);
       int pos = 0;
-      while (pos < Parent.key_num && (Parent.keys[pos] < NewKey || Parent.keys[pos] == NewKey)) ++pos;
+      while (pos < Parent.key_num && (Parent.keys[pos] < NewKey || Parent.keys[pos] == NewKey)) {
+        auto temp = readNode(Parent.child_offset[pos + 1]);
+        //for (int i = 0; i < temp.key_num; ++i) {
+        //  std::cout << temp.keys[i] << " ";
+        //} 
+        if (Parent.keys[pos + 1] == NewKey) {
+          while (!temp.is_leaf) {
+            temp = readNode(temp.child_offset[temp.key_num]);
+            if (!(temp.keys[temp.key_num - 1] == NewKey)) {
+              break;
+            }
+          }
+          if (!(temp.keys[temp.key_num - 1] == NewKey)) {
+            break;
+          }
+        }
+        ++pos;
+      }
       for (int i = Parent.key_num; i > pos; --i) {
         Parent.keys[i] = Parent.keys[i - 1];
         Parent.child_offset[i + 1] = Parent.child_offset[i];
@@ -613,12 +646,7 @@ public:
     }
   };
 
-  ~BPlusTree() {
-    fstream file1(IndexFile.file_name, ios::trunc);
-    fstream file2(DataFile.file_name, ios::trunc);
-    file1.close();
-    file2.close();
-  }
+  ~BPlusTree() = default;
 
   //向BPT中插入key_value键值对
   void insert(const Key& key, T& value) {

@@ -238,11 +238,7 @@ private:
       //std::cout << "modify parent" << std::endl;
       IndexNode Parent = readNode(node.parent);
       int pos = 0;
-      while (pos < Parent.key_num && (Parent.keys[pos] < NewKey)) {
-        ++pos;
-      }
-      //std::cout << "pos: " << pos << std::endl;
-      while (readNode(Parent.child_offset[pos]).keys[readNode(Parent.child_offset[pos]).key_num - 1] == NewKey && pos < Parent.key_num) {
+      while (pos < Parent.key_num && !(Parent.child_offset[pos] == node.offset)) {
         ++pos;
       }
       //std::cout << "pos: " << pos << std::endl;
@@ -309,8 +305,7 @@ private:
     } else {
       IndexNode Parent = readNode(node.parent);
       int pos = 0;
-      while (pos < Parent.key_num && (Parent.keys[pos] < NewKey)) {
-        auto temp = readNode(Parent.child_offset[pos + 1]);
+      while (pos < Parent.key_num && !(Parent.child_offset[pos] == node.offset)) {
         //for (int i = 0; i < temp.key_num; ++i) {
         //  std::cout << temp.keys[i] << " ";
         //} 

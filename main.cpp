@@ -47,9 +47,8 @@ int main() {
     } else if (order == "find") {
       Key key;
       std::cin >> key;
-      bool if_find = db.find(key);
-      if (if_find) {
-        sjtu::vector<int> res = db.find_all(key);
+      auto res = db.find_all(key);
+      if (res.size() > 0) {
         for (int i = 0; i < res.size(); i++) {
           std::cout << res[i] << ' ';
         }

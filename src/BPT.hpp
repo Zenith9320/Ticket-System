@@ -15,7 +15,7 @@ using std::string;
 using std::fstream;
 using std::ios;
 
-const int SIZE = 100;
+const int SIZE = 89;
 const int STR_LEN = 65;
 
 /********************************************************************/
@@ -360,7 +360,7 @@ private:
         return;
       }
     }
-    if (index < parent_node.key_num) {
+    if (index <= parent_node.key_num) {
       //std::cout << "borrow from right" << std::endl;
       IndexNode right_sibling = readNode(parent_node.child_offset[index + 1]);
       if (right_sibling.key_num > (SIZE + 1) / 2) {
@@ -416,7 +416,7 @@ private:
       if (parent_node.key_num < (SIZE + 1) / 2) {
         mergeNode(parent_node);
       }
-    } else if (index < parent_node.key_num) {
+    } else if (index <= parent_node.key_num) {
       //std::cout << "merge right" << std::endl;
       IndexNode right_sibling = readNode(parent_node.child_offset[index + 1]);
       int start = node.key_num;
@@ -495,7 +495,7 @@ private:
         return;
       }
     }
-    if (index < parent_node.key_num) {
+    if (index <= parent_node.key_num) {
       IndexNode right_sibling = readNode(parent_node.child_offset[index + 1]);
       if (right_sibling.key_num > (SIZE + 1) / 2) {
         node.keys[node.key_num] = parent_node.keys[index];
@@ -552,7 +552,7 @@ private:
       if (parent_node.key_num < (SIZE + 1) / 2) {
         mergeNode(parent_node);
       }
-    } else if (index < parent_node.key_num) {
+    } else if (index <= parent_node.key_num) {
       IndexNode right_sibling = readNode(parent_node.child_offset[index + 1]);
       int start = node.key_num;
       node.keys[start] = parent_node.keys[index];

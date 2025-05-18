@@ -1,5 +1,27 @@
 #include "src/BPT.hpp"
 int n;
+int string_to_int(const string& str) {
+  if (str.empty()) return 0;
+  if (str[0] == '-') return -string_to_int(str.substr(1));
+  int res = 0;
+  for (int i = 0; i < str.size(); i++) {
+    res = res * 10 + str[i] - '0';
+  }
+  return res;
+}
+bool check_int(const string& str) {
+  if (str.empty()) return false;
+  if (str[0] == '-') {
+    for (int i = 1; i < str.size(); i++) {
+      if (str[i] < '0' || str[i] > '9') return false;
+    }
+  } else {
+    for (int i = 0; i < str.size(); i++) {
+      if (str[i] < '0' || str[i] > '9') return false;
+    }
+  }
+  return true;
+}
 int main() {
   std::ios::sync_with_stdio(false);
   std::cin.tie(nullptr);
@@ -10,9 +32,13 @@ int main() {
     std::cin >> order;
     if (order == "insert") {
       Key key;
-      int value;
+      string value;
       std::cin >> key >> value;
-      db.insert(key, value);
+      if (!check_int(value)) {
+        continue;
+      }
+      int value1 = string_to_int(value);
+      db.insert(key, value1);
     } else if (order == "delete") {
       Key key;
       int value;

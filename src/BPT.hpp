@@ -70,7 +70,7 @@ struct Key {
     std::string temp;
     is >> temp;
     std::strncpy(key.data, temp.c_str(), STR_LEN - 1);
-    key.data[99] = '\0'; 
+    key.data[STR_LEN - 1] = '\0'; 
     return is;
   }
 };
@@ -121,7 +121,7 @@ write_offset->offset
 */
 struct BPT_Meta {
   int root;                         //根节点的偏移量
-  int total_num;                 //总的键值对个数
+  int total_num;                    //总的键值对个数
   int write_offset;                 //下一个写入的位置
 
   BPT_Meta() : root(0), total_num(0), write_offset(3 * sizeof(int)) {};
@@ -404,8 +404,8 @@ private:
       node.prev = -1;
       node.next = -1;
       for (int i = 0; i < SIZE + 5; ++i) {
-          node.keys[i] = Key();
-          node.child_offset[i] = -1;
+        node.keys[i] = Key();
+        node.child_offset[i] = -1;
       }
       writeNode(node);
       if (parent_node.key_num < (SIZE + 1) / 2) {
@@ -900,24 +900,6 @@ public:
     }
     --cur.key_num;
     --basic_info.total_num;
-    if (cur.key_num == 0) {
-      cur.key_num = 0;
-    }
-    if (cur.next != -1 && cur.key_num == 0) {
-      auto temp = readNode(cur.next);
-      temp.prev = cur.prev;
-      writeNode(temp);
-    }
-    if (cur.prev != -1 && cur.key_num == 0) {
-      auto temp = readNode(cur.prev);
-      temp.next = cur.next;
-      writeNode(temp);
-    }
-    if (cur.key_num == 0) {
-      cur.prev = -1;
-      cur.next = -1;
-      cur.parent = -1;
-    }
     writeNode(cur);
     if (basic_info.total_num == 0) {
       basic_info.root = -1;
@@ -926,10 +908,9 @@ public:
     /*if (ErasePos == 0 && cur.parent != -1) {
       updateParentKey(cur.parent, cur.offset, cur.keys[0]);
     }*/
-    
-    //if (cur.key_num > 0 && cur.key_num < (SIZE + 1) / 2) {
-    //  mergeNode(cur);
-    //}
+    if (cur.key_num >= 0 && cur.key_num < (SIZE + 1) / 2) {
+      mergeNode(cur);
+    }
     return true;
   }
 

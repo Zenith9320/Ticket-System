@@ -332,14 +332,16 @@ private:
     if (node.parent == -1) return;
     IndexNode parent_node = readNode(node.parent);
     int index = -1;
-    for (int i = 0; i < parent_node.key_num; ++i) {
+    for (int i = 0; i <= parent_node.key_num; ++i) {
       if (parent_node.child_offset[i] == node.offset) {
         index = i;
         break;
       }
     }
+    //std::cout << "index: " << index << std::endl;
     if (index == -1) return;
     if (index > 0) {
+      //std::cout << "borrow from left" << std::endl;
       IndexNode left_sibling = readNode(parent_node.child_offset[index - 1]);
       if (left_sibling.key_num > (SIZE + 1) / 2) {
         // 借位
@@ -359,6 +361,7 @@ private:
       }
     }
     if (index < parent_node.key_num) {
+      //std::cout << "borrow from right" << std::endl;
       IndexNode right_sibling = readNode(parent_node.child_offset[index + 1]);
       if (right_sibling.key_num > (SIZE + 1) / 2) {
         // 借位
@@ -377,7 +380,9 @@ private:
         return;
       }
     }
+    //std::cout << "index: " << index << std::endl;
     if (index > 0) {
+      //std::cout << "merge left" << std::endl;
       IndexNode left_sibling = readNode(parent_node.child_offset[index - 1]);
       int start = left_sibling.key_num;
       for (int i = 0; i < node.key_num; ++i) {
@@ -412,6 +417,7 @@ private:
         mergeNode(parent_node);
       }
     } else if (index < parent_node.key_num) {
+      //std::cout << "merge right" << std::endl;
       IndexNode right_sibling = readNode(parent_node.child_offset[index + 1]);
       int start = node.key_num;
       for (int i = 0; i < right_sibling.key_num; ++i) {
@@ -634,7 +640,7 @@ public:
       auto cur = readNode(basic_info.root);
       while (!cur.is_leaf) {
         int i = 0;
-        while (i < cur.key_num && key >= cur.keys[i]) ++i;
+        while (i < cur.key_num && key > cur.keys[i]) ++i;
         cur = readNode(cur.child_offset[i]);
       }
       while (cur.keys[cur.key_num - 1] == key && cur.next != -1 && cur.key_num >= SIZE) {
@@ -890,6 +896,12 @@ public:
       //std::cout << "pair not found" << std::endl;
       return false;
     }
+    /*std::cout << "erase node:" << std::endl;
+    for (int i = 0; i < cur.key_num; ++i) {
+      std::cout << cur.keys[i] << " ";
+    }
+    std::cout << std::endl;
+    std::cout << "ErasePos: " << ErasePos << std::endl;*/
     for (int i = ErasePos; i < cur.key_num - 1; ++i) {
       cur.keys[i] = cur.keys[i + 1];
       cur.child_offset[i] = cur.child_offset[i + 1];
@@ -900,17 +912,18 @@ public:
     }
     --cur.key_num;
     --basic_info.total_num;
-    writeNode(cur);
     if (basic_info.total_num == 0) {
       basic_info.root = -1;
     }
-    updateInfo();
+    writeNode(cur);
     /*if (ErasePos == 0 && cur.parent != -1) {
       updateParentKey(cur.parent, cur.offset, cur.keys[0]);
     }*/
     if (cur.key_num >= 0 && cur.key_num < (SIZE + 1) / 2) {
+      //std::cout << "merge" << std::endl;
       mergeNode(cur);
     }
+    updateInfo();
     return true;
   }
 

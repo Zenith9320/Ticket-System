@@ -43,7 +43,7 @@ int main() {
       Key key;
       int value;
       std::cin >> key >> value;
-      if (db.find(key)) db.erase(key, value);
+      db.erase(key, value);
     } else if (order == "find") {
       Key key;
       std::cin >> key;

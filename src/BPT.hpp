@@ -238,22 +238,8 @@ private:
       //std::cout << "modify parent" << std::endl;
       IndexNode Parent = readNode(node.parent);
       int pos = 0;
-      while (pos < Parent.key_num && (Parent.keys[pos] < NewKey || Parent.keys[pos] == NewKey)) {
-        auto temp = readNode(Parent.child_offset[pos + 1]);
-        //for (int i = 0; i < temp.key_num; ++i) {
-        //  std::cout << temp.keys[i] << " ";
-        //} 
-        if (Parent.keys[pos] == NewKey) {
-          while (!temp.is_leaf) {
-            temp = readNode(temp.child_offset[temp.key_num]);
-            if (!(temp.keys[temp.key_num - 1] == NewKey)) {
-              break;
-            }
-          }
-          if (!(temp.keys[temp.key_num - 1] == NewKey)) {
-            break;
-          }
-        }
+      while (pos < Parent.key_num && (Parent.keys[pos] < NewKey)) {
+        
         ++pos;
       }
       //std::cout << "pos: " << pos << std::endl;
@@ -320,22 +306,11 @@ private:
     } else {
       IndexNode Parent = readNode(node.parent);
       int pos = 0;
-      while (pos < Parent.key_num && (Parent.keys[pos] < NewKey || Parent.keys[pos] == NewKey)) {
+      while (pos < Parent.key_num && (Parent.keys[pos] < NewKey)) {
         auto temp = readNode(Parent.child_offset[pos + 1]);
         //for (int i = 0; i < temp.key_num; ++i) {
         //  std::cout << temp.keys[i] << " ";
         //} 
-        if (Parent.keys[pos + 1] == NewKey) {
-          while (!temp.is_leaf) {
-            temp = readNode(temp.child_offset[temp.key_num]);
-            if (!(temp.keys[temp.key_num - 1] == NewKey)) {
-              break;
-            }
-          }
-          if (!(temp.keys[temp.key_num - 1] == NewKey)) {
-            break;
-          }
-        }
         ++pos;
       }
       for (int i = Parent.key_num; i > pos; --i) {
@@ -393,7 +368,7 @@ private:
         return;
       }
     }
-    if (index <= parent_node.key_num) {
+    if (index < parent_node.key_num) {
       //std::cout << "borrow from right" << std::endl;
       IndexNode right_sibling = readNode(parent_node.child_offset[index + 1]);
       if (right_sibling.key_num > (SIZE + 1) / 2) {
@@ -695,31 +670,6 @@ public:
     }
   }
 
-  //查找key对应的Value, 找到返回true，否则返回false
-  bool find(const Key& key) {
-    //std::cout << "find: " << key << std::endl;
-    if (basic_info.total_num == 0) {
-      return false;
-    }
-    IndexNode cur = readNode(basic_info.root);
-    while (cur.is_leaf == false) {
-      int idx = 0;
-      while (idx < cur.key_num && key >= cur.keys[idx]) {
-        //std::cout << "idx: " << idx << std::endl;
-        //std::cout << "child_offset: " << cur.child_offset[idx] << std::endl;
-        //std::cout << readValue(cur.child_offset[idx]) << std::endl;
-        idx++;
-      }
-      cur = readNode(cur.child_offset[idx]);
-    }
-    for (int i = 0; i < cur.key_num; ++i) {
-      if (cur.keys[i] == key) {
-        return true;
-      }
-    }
-    return false;
-  }
-
   bool find_pair(const Key& key, const T& value) {
     if (basic_info.total_num == 0) {
       return false;
@@ -833,6 +783,9 @@ public:
     if (basic_info.total_num == 0) {
       return false;
     }
+    if (!find_pair(key, value)) {
+      return false;
+    }
     IndexNode cur = readNode(basic_info.root);
     while (cur.is_leaf == false) {
       int idx = 0;
@@ -920,26 +873,12 @@ public:
       basic_info.root = -1;
     }
     writeNode(cur);
-    /*if (ErasePos == 0 && cur.parent != -1) {
-      updateParentKey(cur.parent, cur.offset, cur.keys[0]);
-    }*/
     if (cur.key_num >= 0 && cur.key_num < (SIZE + 1) / 2) {
       //std::cout << "merge" << std::endl;
       mergeNode(cur);
     }
     updateInfo();
     return true;
-  }
-
-  void updateParentKey(int parent_offset, int child_offset, Key new_key) {
-    IndexNode parent = readNode(parent_offset);
-    for (int i = 0; i < parent.key_num; ++i) {
-      if (parent.child_offset[i] == child_offset) {
-        parent.keys[i] = new_key;
-        break;
-      }
-    }
-    writeNode(parent);
   }
 
   //清空整棵树

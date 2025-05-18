@@ -1,3 +1,5 @@
+target_compile_options(my_target PRIVATE -Ofast)
+
 cmake_minimum_required(VERSION 3.10)
 
 project(code)

@@ -724,16 +724,9 @@ public:
     if (basic_info.total_num == 0) {
       return false;
     }
-    IndexNode cur = readNode(basic_info.root);
-    while (cur.is_leaf == false) {
-      int idx = 0;
-      while (idx < cur.key_num && key >= cur.keys[idx]) {
-        idx++;
-      }
-      cur = readNode(cur.child_offset[idx]);
-    }
-    for (int i = 0; i < cur.key_num; ++i) {
-      if (cur.keys[i] == key && readValue(cur.child_offset[i]) == value) {
+    auto res = find_all(key);
+    for (int i = 0; i < res.size(); ++i) {
+      if (res[i] == value) {
         return true;
       }
     }
@@ -755,23 +748,6 @@ public:
         idx++;
       }
       cur = readNode(cur.child_offset[idx]);
-    }
-    while (cur.prev != -1) {
-      IndexNode prev = readNode(cur.prev);
-      if (prev.key_num > 0 && prev.keys[prev.key_num - 1] == key) {
-        cur = prev;
-      } else {
-        break;
-      }
-    }
-    if (cur.prev != -1) {
-      IndexNode temp = readNode(cur.prev);
-      int temp_idx = temp.key_num - 1;
-      while (temp.keys[temp_idx] == key && temp_idx >= 0) {
-        T haha = readValue(cur.child_offset[temp_idx]);
-        res.insert({haha, haha});
-        temp_idx--;
-      }
     }
     bool found = false;
     for (int i = 0; i < cur.key_num; ++i) {
@@ -1018,7 +994,7 @@ void print_leaves() {
   while (cur.offset != -1) {
     std::cout << "(";
     for (int i = 0; i < cur.key_num; ++i) {
-      std::cout << cur.keys[i];
+      std::cout << '[' << cur.keys[i] << ',' << readValue(cur.child_offset[i]) << ']';
       if (i != cur.key_num - 1) std::cout << ",";
     }
     std::cout << ") -> ";

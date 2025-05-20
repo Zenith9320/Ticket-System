@@ -15,7 +15,7 @@ using std::string;
 using std::fstream;
 using std::ios;
 
-const int SIZE = 2;
+const int SIZE = 100;
 const int STR_LEN = 65;
 
 /********************************************************************/
@@ -85,7 +85,7 @@ struct Key {
 template<class T>
 struct KeyValue {
   Key key;                          //存储键
-  T value;                        //存储值
+  T value;                          //存储值
   KeyValue<T>() = default;
   KeyValue(const Key& _key, T _value) : key(_key), value(_value) {};
   KeyValue& operator=(const KeyValue& other) {
@@ -187,7 +187,6 @@ class BPlusTree {
 private:
   string file_name;
   MemoryRiver<IndexNode<T>, 3> IndexFile;
-  MemoryRiver<T, 0> DataFile;
   BPT_Meta basic_info;
 
   /*****BPT_Meta的读取和写入*****/
@@ -218,19 +217,6 @@ private:
   //在合适位置写入一个Node
   void writeNode(IndexNode<T>& target) {
     IndexFile.writeT(target, target.offset);
-  }
-
-  /*****ValueFile的读取和写入*****/
-  //在offset位置读取一个T
-  T readValue(int offset) {
-    T res;
-    DataFile.read(res, offset);
-    return res;
-  }
-
-  //在合适位置写入一个T
-  int writeValue(T& target) {
-    return DataFile.write(target);
   }
 
   /*****split操作*****/
@@ -652,11 +638,10 @@ private:
 
 public:
   BPlusTree(string base_filename, string index_filename, string value_filename) :
-  file_name(base_filename), IndexFile(base_filename + index_filename), DataFile(base_filename + value_filename) {
+  file_name(base_filename), IndexFile(base_filename) {
     fstream file(IndexFile.file_name, ios::in | ios::out | ios::binary);
     if (!file.is_open()) {
       IndexFile.initialise();
-      DataFile.initialise();
       basic_info.root = -1;
       basic_info.total_num = 0;
       basic_info.write_offset = 3 * sizeof(int);
@@ -791,7 +776,7 @@ public:
           cur = prev_node;
           for (int i = prev_node.kv_num - 1; i >= 0; --i) {
             if (prev_node.keyvalues[i].key == key) {
-              T haha = readValue(cur.child_offset[i]);
+              T haha = prev_node.keyvalues[i].value;
               res.insert({haha, haha});
             } else if (prev_node.keyvalues[i].key < key) {
               break;

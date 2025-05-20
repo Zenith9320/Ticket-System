@@ -706,8 +706,15 @@ public:
     IndexNode<T> cur = readNode(basic_info.root);
     while (cur.is_leaf == false) {
       int idx = 0;
-      while (idx < cur.kv_num && kv >= cur.keyvalues[idx]) {
-        idx++;
+      int left = 0, right = cur.kv_num - 1;
+      while (left <= right) {
+        int mid = left + (right - left) / 2;
+        if (cur.keyvalues[mid] > kv) {
+          idx = mid;
+          right = mid - 1;
+        } else {
+          left = mid + 1;
+        }
       }
       cur = readNode(cur.child_offset[idx]);
     }
@@ -737,8 +744,14 @@ public:
     IndexNode<T> cur = readNode(basic_info.root);
     while (cur.is_leaf == false) {
       int idx = 0;
-      while (idx < cur.kv_num && key >= cur.keyvalues[idx].key) {
-        idx++;
+      while (left <= right) {
+        int mid = left + (right - left) / 2;
+        if (cur.keyvalues[mid] > kv) {
+          idx = mid;
+          right = mid - 1;
+        } else {
+          left = mid + 1;
+        }
       }
       cur = readNode(cur.child_offset[idx]);
     }
@@ -805,16 +818,18 @@ public:
     if (basic_info.total_num == 0) {
       return false;
     }
-    if (!find_pair(key, value)) {
-      //std::cout << "pair not found" << std::endl;
-      return false;
-    }
     KeyValue<T> kv(key, value);
     IndexNode<T> cur = readNode(basic_info.root);
     while (cur.is_leaf == false) {
       int idx = 0;
-      while (idx < cur.kv_num && kv >= cur.keyvalues[idx]) {
-        idx++;
+      while (left <= right) {
+        int mid = left + (right - left) / 2;
+        if (cur.keyvalues[mid] > kv) {
+          idx = mid;
+          right = mid - 1;
+        } else {
+          left = mid + 1;
+        }
       }
       cur = readNode(cur.child_offset[idx]);
     }

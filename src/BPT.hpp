@@ -718,6 +718,11 @@ public:
         break;
       }
     }
+    //very important
+    cur = readNode(cur.prev);
+    if (cur.keyvalues[cur.kv_num - 1] == kv) {
+      return true;
+    }
     return false;
   }
 
@@ -816,6 +821,15 @@ public:
     for (int i = 0; i < cur.kv_num; i++) {
       if (cur.keyvalues[i] == kv) {
         ErasePos = i;
+      }
+    }
+    if (ErasePos == -1) {
+      cur = readNode(cur.prev);
+      for (int i = cur.kv_num - 1; i >= 0; --i) {
+        if (cur.keyvalues[i] == kv) {
+          ErasePos = i;
+          break;
+        }
       }
     }
     if (ErasePos == -1) {

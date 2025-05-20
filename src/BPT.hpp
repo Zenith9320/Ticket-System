@@ -706,15 +706,8 @@ public:
     IndexNode<T> cur = readNode(basic_info.root);
     while (cur.is_leaf == false) {
       int idx = 0;
-      int left = 0, right = cur.kv_num - 1;
-      while (left <= right) {
-        int mid = left + (right - left) / 2;
-        if (cur.keyvalues[mid] > kv) {
-          idx = mid;
-          right = mid - 1;
-        } else {
-          left = mid + 1;
-        }
+      while (idx < cur.kv_num && kv >= cur.keyvalues[idx]) {
+        idx++;
       }
       cur = readNode(cur.child_offset[idx]);
     }
@@ -744,7 +737,6 @@ public:
     IndexNode<T> cur = readNode(basic_info.root);
     while (cur.is_leaf == false) {
       int idx = 0;
-      int left = 0, right = cur.kv_num - 1;
       while (idx < cur.kv_num && key >= cur.keyvalues[idx].key) {
         idx++;
       }
@@ -817,15 +809,8 @@ public:
     IndexNode<T> cur = readNode(basic_info.root);
     while (cur.is_leaf == false) {
       int idx = 0;
-      int left = 0, right = cur.kv_num - 1;
-      while (left <= right) {
-        int mid = left + (right - left) / 2;
-        if (cur.keyvalues[mid] > kv) {
-          idx = mid;
-          right = mid - 1;
-        } else {
-          left = mid + 1;
-        }
+      while (idx < cur.kv_num && kv >= cur.keyvalues[idx]) {
+        idx++;
       }
       cur = readNode(cur.child_offset[idx]);
     }

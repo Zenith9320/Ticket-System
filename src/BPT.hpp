@@ -15,7 +15,7 @@ using std::string;
 using std::fstream;
 using std::ios;
 
-const int SIZE = 100;
+const int SIZE = 3;
 const int STR_LEN = 65;
 
 /********************************************************************/
@@ -637,7 +637,7 @@ private:
   }
 
 public:
-  BPlusTree(string base_filename, string index_filename, string value_filename) :
+  BPlusTree(string base_filename) :
   file_name(base_filename), IndexFile(base_filename) {
     fstream file(IndexFile.file_name, ios::in | ios::out | ios::binary);
     if (!file.is_open()) {
@@ -806,13 +806,14 @@ public:
       return false;
     }
     if (!find_pair(key, value)) {
+      //std::cout << "pair not found" << std::endl;
       return false;
     }
     KeyValue<T> kv(key, value);
     IndexNode<T> cur = readNode(basic_info.root);
     while (cur.is_leaf == false) {
       int idx = 0;
-      while (idx < cur.kv_num && key >= cur.keyvalues[idx].key) {
+      while (idx < cur.kv_num && kv >= cur.keyvalues[idx]) {
         idx++;
       }
       cur = readNode(cur.child_offset[idx]);
@@ -825,11 +826,8 @@ public:
     }
     if (ErasePos == -1) {
       cur = readNode(cur.prev);
-      for (int i = cur.kv_num - 1; i >= 0; --i) {
-        if (cur.keyvalues[i] == kv) {
-          ErasePos = i;
-          break;
-        }
+      if (cur.keyvalues[cur.kv_num - 1] == kv) {
+        ErasePos = cur.kv_num - 1;
       }
     }
     if (ErasePos == -1) {

@@ -26,7 +26,7 @@ int main() {
   std::ios::sync_with_stdio(false);
   std::cin.tie(nullptr);
   std::cin >> n;
-  BPlusTree<int> db("template", "_index", "_value");
+  BPlusTree<int> db("template");
   for (int i = 0; i < n; i++) {
     string order;
     std::cin >> order;

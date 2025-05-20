@@ -15,7 +15,7 @@ using std::string;
 using std::fstream;
 using std::ios;
 
-const int SIZE = 80;
+const int SIZE = 70;
 const int STR_LEN = 65;
 
 /********************************************************************/
@@ -189,6 +189,58 @@ private:
   MemoryRiver<IndexNode<T>, 3> IndexFile;
   BPT_Meta basic_info;
 
+  /*cache结构体*/
+  struct CacheEntry {
+    IndexNode<T> node;
+    int timestamp;
+    CacheEntry() : node(), timestamp(0) {}
+    CacheEntry(const IndexNode<T>& _node, int _timestamp) : node(_node), timestamp(_timestamp) {}
+  };
+
+  int access_counter;
+  sjtu::map<int, CacheEntry> cache; 
+  const int cache_size = 100;
+
+  void evictLRU() {
+    if (cache.empty()) return;
+    int lru_key = -1;
+    int min_timestamp = INT_MAX;
+    for (const auto& entry : cache) {
+      if (entry.second.timestamp < min_timestamp) {
+        min_timestamp = entry.second.timestamp;
+        lru_key = entry.first;
+      }
+    }
+    if (lru_key != -1) {
+      cache.erase(cache.find(lru_key));
+    }
+  }
+
+  IndexNode<T> cacheread(int index) {
+    auto it = cache.find(index);
+    if (it != cache.end()) {
+      it->second.timestamp = access_counter++;
+      return it->second.node;
+    } else {
+      IndexNode<T> node;
+      IndexFile.read(node, index);
+      if (cache.size() >= cache_size) {
+        evictLRU();
+      }
+      cache[index] = CacheEntry(node, access_counter++);
+      return node;
+    }
+  }
+
+  void cachewrite(IndexNode<T>& node) {
+    IndexFile.writeT(node, node.offset);
+    auto it = cache.find(node.offset);
+    if (it != cache.end()) {
+      it->second.node = node;
+      it->second.timestamp = access_counter++;
+    }
+  }
+
   /*****BPT_Meta的读取和写入*****/
   //读入BOPT_Meta
   BPT_Meta readInfo() {
@@ -209,14 +261,12 @@ private:
   /*****IndexFile的读取和写入*****/
   //在index位置读取一个Node
   IndexNode<T> readNode(int index) {
-    IndexNode<T> res;
-    IndexFile.read(res, index);
-    return res;
+    return cacheread(index);
   }
 
   //在合适位置写入一个Node
   void writeNode(IndexNode<T>& target) {
-    IndexFile.writeT(target, target.offset);
+    cachewrite(target);
   }
 
   /*****split操作*****/
@@ -638,7 +688,7 @@ private:
 
 public:
   BPlusTree(string base_filename) :
-  file_name(base_filename), IndexFile(base_filename) {
+  file_name(base_filename), IndexFile(base_filename), access_counter(0) {
     fstream file(IndexFile.file_name, ios::in | ios::out | ios::binary);
     if (!file.is_open()) {
       IndexFile.initialise();

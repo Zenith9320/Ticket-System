@@ -744,6 +744,7 @@ public:
     IndexNode<T> cur = readNode(basic_info.root);
     while (cur.is_leaf == false) {
       int idx = 0;
+      int left = 0, right = cur.kv_num - 1;
       while (left <= right) {
         int mid = left + (right - left) / 2;
         if (cur.keyvalues[mid] > kv) {
@@ -822,6 +823,7 @@ public:
     IndexNode<T> cur = readNode(basic_info.root);
     while (cur.is_leaf == false) {
       int idx = 0;
+      int left = 0, right = cur.kv_num - 1;
       while (left <= right) {
         int mid = left + (right - left) / 2;
         if (cur.keyvalues[mid] > kv) {

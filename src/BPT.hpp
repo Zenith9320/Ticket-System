@@ -192,52 +192,76 @@ private:
   /*cache结构体*/
   struct CacheEntry {
     IndexNode<T> node;
-    int timestamp;
-    CacheEntry() : node(), timestamp(0) {}
-    CacheEntry(const IndexNode<T>& _node, int _timestamp) : node(_node), timestamp(_timestamp) {}
+    bool dirty = false;
+    CacheEntry* prev = nullptr;
+    CacheEntry* next = nullptr;
+    CacheEntry(const IndexNode<T>& n) : node(n) {}
   };
 
-  int access_counter;
-  sjtu::map<int, CacheEntry> cache; 
+  sjtu::map<int, CacheEntry*> cache;
+  CacheEntry* lru_head = nullptr;
+  CacheEntry* lru_tail = nullptr;
   const int cache_size = 1000;
+  int access_counter = 0;
+
+  void moveToHead(CacheEntry* ce) {
+    if (ce == lru_head) return;
+    if (ce->prev) ce->prev->next = ce->next;
+    if (ce->next) ce->next->prev = ce->prev;
+    if (ce == lru_tail) lru_tail = ce->prev;
+    ce->prev = nullptr;
+    ce->next = lru_head;
+    if (lru_head) lru_head->prev = ce;
+    lru_head = ce;
+    if (!lru_tail) lru_tail = ce;
+  }
+
+  void addToHead(CacheEntry* ce) {
+    ce->prev = nullptr;
+    ce->next = lru_head;
+    if (lru_head) lru_head->prev = ce;
+    lru_head = ce;
+    if (!lru_tail) lru_tail = ce;
+  }
 
   void evictLRU() {
-    if (cache.empty()) return;
-    int lru_key = -1;
-    int min_timestamp = INT_MAX;
-    for (const auto& entry : cache) {
-      if (entry.second.timestamp < min_timestamp) {
-        min_timestamp = entry.second.timestamp;
-        lru_key = entry.first;
-      }
+    if (!lru_tail) return;
+    CacheEntry* old = lru_tail;
+    if (old->dirty) IndexFile.writeT(old->node, old->node.offset);
+    cache.erase(cache.find(old->node.offset));
+    if (old->prev) {
+      lru_tail = old->prev;
+      lru_tail->next = nullptr;
+    } else {
+      lru_head = lru_tail = nullptr;
     }
-    if (lru_key != -1) {
-      cache.erase(cache.find(lru_key));
-    }
+    delete old;
   }
 
   IndexNode<T> cacheread(int index) {
     auto it = cache.find(index);
     if (it != cache.end()) {
-      it->second.timestamp = access_counter++;
-      return it->second.node;
-    } else {
-      IndexNode<T> node;
-      IndexFile.read(node, index);
-      if (cache.size() >= cache_size) {
-        evictLRU();
-      }
-      cache[index] = CacheEntry(node, access_counter++);
-      return node;
+      CacheEntry* ce = it->second;
+      moveToHead(ce);
+      return ce->node;
     }
+    IndexNode<T> node;
+    IndexFile.read(node, index);
+    if ((int)cache.size() >= cache_size) evictLRU();
+    CacheEntry* ce = new CacheEntry(node);
+    cache[index] = ce;
+    addToHead(ce);
+    return node;
   }
 
   void cachewrite(IndexNode<T>& node) {
     IndexFile.writeT(node, node.offset);
     auto it = cache.find(node.offset);
     if (it != cache.end()) {
-      it->second.node = node;
-      it->second.timestamp = access_counter++;
+      CacheEntry* ce = it->second;
+      ce->node = node;
+      ce->dirty = false;
+      moveToHead(ce);
     }
   }
 
@@ -701,7 +725,14 @@ public:
     }
   };
 
-  ~BPlusTree() = default;
+  ~BPlusTree() {
+    CacheEntry* cur = lru_head;
+    while (cur) {
+      CacheEntry* nxt = cur->next;
+      delete cur;
+      cur = nxt;
+    }
+  };
 
   //向BPT中插入key_value键值对
   void insert(const Key& key, T& value) {
@@ -854,10 +885,17 @@ public:
     }
     IndexNode<T> cur = readNode(basic_info.root);
     while (cur.is_leaf == false) {
-      int idx = 0;
-      while (idx < cur.kv_num && key > cur.keyvalues[idx].key) {//找到第一个大于等于key的分割点
-        idx++;
+      int left = 0;
+      int right = cur.kv_num;
+      while (left < right) {
+        int mid = left + (right - left) / 2;
+        if (key > cur.keyvalues[mid].key) {
+          left = mid + 1;
+        } else {
+          right = mid;
+        }
       }
+      int idx = left; 
       cur = readNode(cur.child_offset[idx]);
     }
     int idx = 0;

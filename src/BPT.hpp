@@ -15,7 +15,7 @@ using std::string;
 using std::fstream;
 using std::ios;
 
-const int SIZE = 80;
+const int SIZE = 3;
 const int STR_LEN = 65;
 
 /********************************************************************/
@@ -139,7 +139,7 @@ struct IndexNode {                  //把每个节点的元信息包含在节点
   int prev;
   int next;
   KeyValue<T> keyvalues[SIZE + 5];  //存储键
-  size_t kv_num;                   //存储已经有的键的数量
+  size_t kv_num;                    //存储已经有的键的数量
   int child_offset[SIZE + 5];       //存储数据在文件中的偏移量
   int offset;                       //节点的偏移量
 
@@ -891,10 +891,16 @@ public:
     KeyValue<T> kv(key, value);
     IndexNode<T> cur = readNode(basic_info.root);
     while (cur.is_leaf == false) {
-      int idx = 0;
-      while (idx < cur.kv_num && kv >= cur.keyvalues[idx]) {
-        idx++;
+      int left = 0, right = cur.kv_num;
+      while (left < right) {
+        int mid = left + (right - left) / 2;
+        if (kv >= cur.keyvalues[mid]) {
+          left = mid + 1;
+        } else {
+          right = mid;
+        }
       }
+      int idx = left;
       cur = readNode(cur.child_offset[idx]);
     }
     int ErasePos = -1;

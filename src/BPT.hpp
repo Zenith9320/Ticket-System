@@ -199,7 +199,7 @@ private:
 
   int access_counter;
   sjtu::map<int, CacheEntry> cache; 
-  const int cache_size = 600;
+  const int cache_size = 1000;
 
   void evictLRU() {
     if (cache.empty()) return;

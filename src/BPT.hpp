@@ -904,9 +904,16 @@ public:
       cur = readNode(cur.child_offset[idx]);
     }
     int ErasePos = -1;
-    for (int i = 0; i < cur.kv_num; i++) {
-      if (cur.keyvalues[i] == kv) {
-        ErasePos = i;
+    int left = 0, right = cur.kv_num - 1;
+    while (left <= right) {
+      int mid = (left + right) / 2;
+      if (cur.keyvalues[mid] == kv) {
+        ErasePos = mid;
+        break;
+      } else if (cur.keyvalues[mid] < kv) {
+        left = mid + 1;
+      } else {
+        right = mid - 1;
       }
     }
     if (ErasePos == -1) {

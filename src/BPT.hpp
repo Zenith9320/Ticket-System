@@ -15,7 +15,7 @@ using std::string;
 using std::fstream;
 using std::ios;
 
-const int SIZE = 3;
+const int SIZE = 80;
 const int STR_LEN = 65;
 
 /********************************************************************/

@@ -15,7 +15,7 @@ using std::string;
 using std::fstream;
 using std::ios;
 
-const int SIZE = 100;
+const int SIZE = 80;
 const int STR_LEN = 65;
 
 /********************************************************************/
@@ -779,7 +779,7 @@ public:
   //查找所有key对应的value，并且存在一个Vector里
   sjtu::vector<T> find_all(const Key& key) {
     //std::cout << "find_all" << key << std::endl;
-    sjtu::map<T, T> res;
+    /*sjtu::map<T, T> res;
     sjtu::vector<T> ans;
     if (basic_info.total_num == 0) {
       return ans;
@@ -847,8 +847,41 @@ public:
     for (auto it = res.begin(); it != res.end(); it++) {
       ans.push_back(it->second);
     }
+    return ans;*/
+    sjtu::vector<T> ans;
+    if (basic_info.total_num == 0) {
+      return ans;
+    }
+    IndexNode<T> cur = readNode(basic_info.root);
+    while (cur.is_leaf == false) {
+      int idx = 0;
+      while (idx < cur.kv_num && key > cur.keyvalues[idx].key) {//找到第一个大于等于key的分割点
+        idx++;
+      }
+      cur = readNode(cur.child_offset[idx]);
+    }
+    int idx = 0;
+    while (true) {
+      if (idx < cur.kv_num && cur.keyvalues[idx].key <= key) {
+        if (cur.keyvalues[idx].key == key) ans.push_back(cur.keyvalues[idx].value);
+        idx++;
+      } else if (idx >= cur.kv_num) {
+        IndexNode<T> next_node = readNode(cur.next);
+        if (next_node.kv_num > 0 && next_node.keyvalues[0].key <= key) {
+          cur = next_node;
+          idx = 0;
+        } else {
+          //std::cout << "1" << std::endl;
+          break;
+        }
+      } else {
+          //std::cout << "2" << std::endl;
+        break;
+      }
+    }
     return ans;
   }
+ 
 
   //删除key和对应的value
   bool erase(const Key& key, const T& value) {

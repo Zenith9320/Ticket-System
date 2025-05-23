@@ -92,10 +92,20 @@ struct KeyValue {
   T value;                          //存储值
   KeyValue<T>() = default;
   KeyValue(const Key& _key, T _value) : key(_key), value(_value) {};
+<<<<<<< HEAD
   KeyValue(const KeyValue&) = default;
   KeyValue& operator=(const KeyValue&) = default;
   KeyValue(KeyValue&&) noexcept = default;
   KeyValue& operator=(KeyValue&&) noexcept = default;
+=======
+  KeyValue& operator=(KeyValue&& other) noexcept {
+    if (this != &other) {
+      key = std::move(other.key);
+      value = std::move(other.value);
+    }
+    return *this;
+  }
+>>>>>>> 45164326b55fb4522135d34612dafe338b202dfb
 
   bool operator < (const KeyValue& other) const {
     if (key == other.key) return value < other.value;

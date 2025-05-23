@@ -15,7 +15,7 @@ using std::string;
 using std::fstream;
 using std::ios;
 
-const int SIZE = 100;
+const int SIZE = 120;
 const int STR_LEN = 65;
 
 /********************************************************************/
@@ -257,14 +257,12 @@ private:
 
   void cachewrite(IndexNode<T>& node) {
     auto it = cache.find(node.offset);
-    if (it == cache.end()) {
-      cacheread(node.offset);
-      it = cache.find(node.offset);
+    if (it != cache.end()) {
+      CacheEntry* ce = it->second;
+      ce->node = node;
+      ce->dirty = true;
+      moveToHead(ce);
     }
-    CacheEntry* ce = it->second;
-    ce->node = node; 
-    ce->dirty = true;  
-    moveToHead(ce);
   }
 
   /*****BPT_Meta的读取和写入*****/

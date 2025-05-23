@@ -262,6 +262,8 @@ private:
       ce->node = node;
       ce->dirty = true;
       moveToHead(ce);
+    } else {
+      IndexFile.writeT(node, node.offset);
     }
   }
 

@@ -15,7 +15,7 @@ using std::string;
 using std::fstream;
 using std::ios;
 
-const int SIZE = 80;
+const int SIZE = 100;
 const int STR_LEN = 65;
 
 /********************************************************************/
@@ -29,40 +29,43 @@ struct Key {
   Key() {
     std::memset(data, 0, STR_LEN);
   }
+
   Key(const char* str) {
-    strncpy(data, str, STR_LEN - 1);
-    data[STR_LEN - 1] = '\0';
+    size_t len = strlen(str) < STR_LEN - 1 ? strlen(str) : STR_LEN - 1;
+    std::memcpy(data, str, len);
+    data[len] = '\0';
   }
 
   Key& operator=(const Key& other) {
     if (this != &other) {
-      strncpy(data, other.data, STR_LEN);
+      // 直接拷贝整个数组，避免strlen开销
+      std::memcpy(data, other.data, STR_LEN);
     }
     return *this;
   }
 
-  bool operator < (const Key& other) const {
-    return strcmp(data, other.data) < 0;
+  bool operator<(const Key& other) const {
+    return std::strcmp(data, other.data) < 0;
   }
 
-  bool operator > (const Key& other) const {
-    return strcmp(data, other.data) > 0;
+  bool operator>(const Key& other) const {
+    return std::strcmp(data, other.data) > 0;
   }
 
-  bool operator <= (const Key& other) const {
-    return strcmp(data, other.data) <= 0;
+  bool operator<=(const Key& other) const {
+    return std::strcmp(data, other.data) <= 0;
   }
 
-  bool operator >= (const Key& other) const {
-    return strcmp(data, other.data) >= 0;
+  bool operator>=(const Key& other) const {
+    return std::strcmp(data, other.data) >= 0;
   }
 
-  bool operator == (const Key& other) const {
-    return strcmp(data, other.data) == 0;
+  bool operator==(const Key& other) const {
+    return std::strcmp(data, other.data) == 0;
   }
 
-  bool operator != (const Key& other) const {
-    return strcmp(data, other.data) != 0;
+  bool operator!=(const Key& other) const {
+    return std::strcmp(data, other.data) != 0;
   }
 
   friend std::ostream& operator<<(std::ostream& os, const Key& key) {
@@ -73,8 +76,9 @@ struct Key {
   friend std::istream& operator>>(std::istream& is, Key& key) {
     std::string temp;
     is >> temp;
-    std::strncpy(key.data, temp.c_str(), STR_LEN - 1);
-    key.data[STR_LEN - 1] = '\0'; 
+    size_t len = temp.size() < STR_LEN - 1 ? temp.size() : STR_LEN - 1;
+    std::memcpy(key.data, temp.data(), len);
+    key.data[len] = '\0';
     return is;
   }
 };
@@ -752,8 +756,16 @@ public:
     } else {
       auto cur = readNode(basic_info.root);
       while (!cur.is_leaf) {
-        int i = 0;
-        while (i < cur.kv_num && kv > cur.keyvalues[i]) ++i;
+        int left = 0, right = cur.kv_num;
+        while (left < right) {
+          int mid = left + (right - left) / 2;
+          if (kv > cur.keyvalues[mid]) {
+            left = mid + 1;
+          } else {
+            right = mid;
+          }
+        }
+        int i = left;
         cur = readNode(cur.child_offset[i]);
       }
       while (cur.keyvalues[cur.kv_num - 1] == kv && cur.next != -1 && cur.kv_num >= SIZE) {

@@ -202,7 +202,7 @@ private:
   sjtu::map<int, CacheEntry*> cache;
   CacheEntry* lru_head = nullptr;
   CacheEntry* lru_tail = nullptr;
-  const int cache_size = 3000;
+  const int cache_size = 10000;
   int access_counter = 0;
 
   void moveToHead(CacheEntry* ce) {

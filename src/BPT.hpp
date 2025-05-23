@@ -260,14 +260,14 @@ private:
 
   void cachewrite(IndexNode<T>& node) {
     auto it = cache.find(node.offset);
-    if (it != cache.end()) {
-      CacheEntry* ce = it->second;
-      ce->node = node;
-      ce->dirty = true;
-      moveToHead(ce);
-    } else {
-      IndexFile.writeT(node, node.offset);
+    if (it == cache.end()) {
+      cacheread(node.offset);
+      it = cache.find(node.offset);
     }
+    CacheEntry* ce = it->second;
+    ce->node = node; 
+    ce->dirty = true;  
+    moveToHead(ce);
   }
 
   /*****BPT_Meta的读取和写入*****/

@@ -92,13 +92,10 @@ struct KeyValue {
   T value;                          //存储值
   KeyValue<T>() = default;
   KeyValue(const Key& _key, T _value) : key(_key), value(_value) {};
-  KeyValue& operator=(const KeyValue& other) {
-    if (this != &other) {
-      key = other.key;
-      value = other.value;
-    }
-    return *this;
-  }
+  KeyValue(const KeyValue&) = default;
+  KeyValue& operator=(const KeyValue&) = default;
+  KeyValue(KeyValue&&) noexcept = default;
+  KeyValue& operator=(KeyValue&&) noexcept = default;
 
   bool operator < (const KeyValue& other) const {
     if (key == other.key) return value < other.value;
@@ -205,7 +202,7 @@ private:
   sjtu::map<int, CacheEntry*> cache;
   CacheEntry* lru_head = nullptr;
   CacheEntry* lru_tail = nullptr;
-  const int cache_size = 1000;
+  const int cache_size = 3000;
   int access_counter = 0;
 
   void moveToHead(CacheEntry* ce) {

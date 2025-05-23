@@ -228,7 +228,10 @@ private:
   void evictLRU() {
     if (!lru_tail) return;
     CacheEntry* old = lru_tail;
-    if (old->dirty) IndexFile.writeT(old->node, old->node.offset);
+    if (old->dirty) {
+      IndexFile.writeT(old->node, old->node.offset);
+      old->dirty = false;
+    }
     cache.erase(cache.find(old->node.offset));
     if (old->prev) {
       lru_tail = old->prev;

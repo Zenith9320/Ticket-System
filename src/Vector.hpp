@@ -50,6 +50,11 @@ public:
     infile.read(reinterpret_cast<char*>(&value), sizeofT);
     return value;
   }
+  void modify(size_t index, const T& value) {
+    std::ofstream outfile(file, std::ios::binary | std::ios::in);
+    outfile.seekp(index * sizeofT);
+    outfile.write(reinterpret_cast<const char*>(&value), sizeofT);
+  }
   size_t size() const {
     return get_size();
   }

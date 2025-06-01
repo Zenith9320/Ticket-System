@@ -15,7 +15,6 @@ using std::string;
 using std::fstream;
 using std::ios;
 
-const int SIZE = 120;
 const int STR_LEN = 65;
 
 /********************************************************************/
@@ -133,7 +132,7 @@ struct KeyValue {
 /*
 Index节点结构体
 */
-template<class T>
+template<class T, int SIZE>
 struct IndexNode {                  //把每个节点的元信息包含在节点之内
   bool is_leaf;                     //是否叶节点
   int parent;
@@ -183,26 +182,25 @@ struct BPT_Meta {
 };
 
 /********************************************************************/
-template<class T>
+template<class T, int SIZE, int cache_size>
 class BPlusTree {
 private:
   string file_name;
-  MemoryRiver<IndexNode<T>, 3> IndexFile;
+  MemoryRiver<IndexNode<T, SIZE>, 3> IndexFile;
   BPT_Meta basic_info;
 
   /*cache结构体*/
   struct CacheEntry {
-    IndexNode<T> node;
+    IndexNode<T, SIZE> node;
     bool dirty = false;
     CacheEntry* prev = nullptr;
     CacheEntry* next = nullptr;
-    CacheEntry(const IndexNode<T>& n) : node(n) {}
+    CacheEntry(const IndexNode<T, SIZE>& n) : node(n) {}
   };
 
   sjtu::map<int, CacheEntry*> cache;
   CacheEntry* lru_head = nullptr;
   CacheEntry* lru_tail = nullptr;
-  const int cache_size = 10000;
   int access_counter = 0;
 
   void moveToHead(CacheEntry* ce) {
@@ -242,14 +240,14 @@ private:
     delete old;
   }
 
-  IndexNode<T> cacheread(int index) {
+  IndexNode<T, SIZE> cacheread(int index) {
     auto it = cache.find(index);
     if (it != cache.end()) {
       CacheEntry* ce = it->second;
       moveToHead(ce);
       return ce->node;
     }
-    IndexNode<T> node;
+    IndexNode<T, SIZE> node;
     IndexFile.read(node, index);
     if ((int)cache.size() >= cache_size) evictLRU();
     CacheEntry* ce = new CacheEntry(node);
@@ -258,16 +256,15 @@ private:
     return node;
   }
 
-  void cachewrite(IndexNode<T>& node) {
+  void cachewrite(IndexNode<T, SIZE>& node) {
+    IndexFile.writeT(node, node.offset);
     auto it = cache.find(node.offset);
-    if (it == cache.end()) {
-      cacheread(node.offset);
-      it = cache.find(node.offset);
+    if (it != cache.end()) {
+      CacheEntry* ce = it->second;
+      ce->node = node;
+      ce->dirty = false;
+      moveToHead(ce);
     }
-    CacheEntry* ce = it->second;
-    ce->node = node; 
-    ce->dirty = true;  
-    moveToHead(ce);
   }
 
   /*****BPT_Meta的读取和写入*****/
@@ -289,25 +286,25 @@ private:
 
   /*****IndexFile的读取和写入*****/
   //在index位置读取一个Node
-  IndexNode<T> readNode(int index) {
+  IndexNode<T, SIZE> readNode(int index) {
     return cacheread(index);
   }
 
   //在合适位置写入一个Node
-  void writeNode(IndexNode<T>& target) {
+  void writeNode(IndexNode<T, SIZE>& target) {
     cachewrite(target);
   }
 
   /*****split操作*****/
-  void splitLeaf(IndexNode<T>& node) {
+  void splitLeaf(IndexNode<T, SIZE>& node) {
     //std::cout << "SplitLeaf" << std::endl;
     //for (int i = 0; i < node.kv_num; ++i) {
     //  std::cout << node.keyvalues[i] << " ";
     //}
     //std::cout << std::endl;
-    IndexNode<T> NewLeaf;
+    IndexNode<T, SIZE> NewLeaf;
     NewLeaf.offset = basic_info.write_offset;
-    basic_info.write_offset += sizeof(IndexNode<T>);
+    basic_info.write_offset += sizeof(IndexNode<T, SIZE>);
     NewLeaf.is_leaf = true;
     NewLeaf.parent = node.parent;
 
@@ -324,7 +321,7 @@ private:
     node.next = NewLeaf.offset;
     NewLeaf.prev = node.offset;
     if (NewLeaf.next != -1) {
-      IndexNode<T> NewNext = readNode(NewLeaf.next);
+      IndexNode<T, SIZE> NewNext = readNode(NewLeaf.next);
       NewNext.prev = NewLeaf.offset;
       writeNode(NewNext);
     }
@@ -334,9 +331,9 @@ private:
     //调整Key
     KeyValue<T> NewKV = NewLeaf.keyvalues[0];
     if (node.parent == -1) {
-      IndexNode<T> NewRoot(false, -1, -1, -1, 1, 0);
+      IndexNode<T, SIZE> NewRoot(false, -1, -1, -1, 1, 0);
       NewRoot.offset = basic_info.write_offset;
-      basic_info.write_offset += sizeof(IndexNode<T>);
+      basic_info.write_offset += sizeof(IndexNode<T, SIZE>);
       NewRoot.keyvalues[0] = NewKV;
       NewRoot.child_offset[0] = node.offset;
       NewRoot.child_offset[1] = NewLeaf.offset;
@@ -348,7 +345,7 @@ private:
       writeNode(NewLeaf);
     } else {
       //std::cout << "modify parent" << std::endl;
-      IndexNode<T> Parent = readNode(node.parent);
+      IndexNode<T, SIZE> Parent = readNode(node.parent);
       int pos = 0;
       while (pos < Parent.kv_num && !(Parent.child_offset[pos] == node.offset)) {
         ++pos;
@@ -375,11 +372,11 @@ private:
     updateInfo();
   }
 
-  void splitInt(IndexNode<T>& node) {
+  void splitInt(IndexNode<T, SIZE>& node) {
     //std::cout << "SplitInt" << std::endl;
-    IndexNode<T> NewInt;
+    IndexNode<T, SIZE> NewInt;
     NewInt.offset = basic_info.write_offset;
-    basic_info.write_offset += sizeof(IndexNode<T>);
+    basic_info.write_offset += sizeof(IndexNode<T, SIZE>);
     NewInt.is_leaf = false;
     NewInt.parent = node.parent;
 
@@ -391,7 +388,7 @@ private:
     }
     for (int i = 0; i <= NewInt.kv_num; ++i) {
       NewInt.child_offset[i] = node.child_offset[i + SplitPos + 1];
-      IndexNode<T> child = readNode(NewInt.child_offset[i]);
+      IndexNode<T, SIZE> child = readNode(NewInt.child_offset[i]);
       child.parent = NewInt.offset;
       writeNode(child);
     }
@@ -400,9 +397,9 @@ private:
     KeyValue NewKV = NewInt.keyvalues[0];
 
     if (node.parent == -1) {
-      IndexNode<T> NewRoot;
+      IndexNode<T, SIZE> NewRoot;
       NewRoot.offset = basic_info.write_offset;
-      basic_info.write_offset += sizeof(IndexNode<T>);
+      basic_info.write_offset += sizeof(IndexNode<T, SIZE>);
       NewRoot.is_leaf = false;
       NewRoot.kv_num = 1;
       NewRoot.keyvalues[0] = temp_kv;
@@ -415,7 +412,7 @@ private:
       writeNode(NewInt);
       writeNode(NewRoot);
     } else {
-      IndexNode<T> Parent = readNode(node.parent);
+      IndexNode<T, SIZE> Parent = readNode(node.parent);
       int pos = 0;
       while (pos < Parent.kv_num && !(Parent.child_offset[pos] == node.offset)) {
         //for (int i = 0; i < temp.kv_num; ++i) {
@@ -440,15 +437,15 @@ private:
     updateInfo();
   }
 
-  void splitNode(IndexNode<T>& node) {
+  void splitNode(IndexNode<T, SIZE>& node) {
     if (node.is_leaf) splitLeaf(node);
     else splitInt(node);
   }
 
   /*****merge操作*****/
-  void mergeLeaf(IndexNode<T>& node) {
+  void mergeLeaf(IndexNode<T, SIZE>& node) {
     if (node.parent == -1) return;
-    IndexNode<T> parent_node = readNode(node.parent);
+    IndexNode<T, SIZE> parent_node = readNode(node.parent);
     int index = -1;
     for (int i = 0; i <= parent_node.kv_num; ++i) {
       if (parent_node.child_offset[i] == node.offset) {
@@ -460,7 +457,7 @@ private:
     if (index == -1) return;
     if (index > 0) {
       //std::cout << "borrow from left" << std::endl;
-      IndexNode<T> left_sibling = readNode(parent_node.child_offset[index - 1]);
+      IndexNode<T, SIZE> left_sibling = readNode(parent_node.child_offset[index - 1]);
       if (left_sibling.kv_num > (SIZE + 1) / 2) {
         // 借位
         for (int i = node.kv_num; i > 0; --i) {
@@ -480,7 +477,7 @@ private:
     }
     if (index < parent_node.kv_num) {
       //std::cout << "borrow from right" << std::endl;
-      IndexNode<T> right_sibling = readNode(parent_node.child_offset[index + 1]);
+      IndexNode<T, SIZE> right_sibling = readNode(parent_node.child_offset[index + 1]);
       if (right_sibling.kv_num > (SIZE + 1) / 2) {
         // 借位
         node.keyvalues[node.kv_num] = right_sibling.keyvalues[0];
@@ -501,7 +498,7 @@ private:
     //std::cout << "index: " << index << std::endl;
     if (index > 0) {
       //std::cout << "merge left" << std::endl;
-      IndexNode<T> left_sibling = readNode(parent_node.child_offset[index - 1]);
+      IndexNode<T, SIZE> left_sibling = readNode(parent_node.child_offset[index - 1]);
       int start = left_sibling.kv_num;
       for (int i = 0; i < node.kv_num; ++i) {
         left_sibling.keyvalues[start + i] = node.keyvalues[i];
@@ -510,7 +507,7 @@ private:
       left_sibling.kv_num += node.kv_num;
       left_sibling.next = node.next;
       if (node.next != -1) {
-        IndexNode<T> nextleaf = readNode(node.next);
+        IndexNode<T, SIZE> nextleaf = readNode(node.next);
         nextleaf.prev = left_sibling.offset;
         writeNode(nextleaf);
       }
@@ -536,7 +533,7 @@ private:
       }
     } else if (index <= parent_node.kv_num) {
       //std::cout << "merge right" << std::endl;
-      IndexNode<T> right_sibling = readNode(parent_node.child_offset[index + 1]);
+      IndexNode<T, SIZE> right_sibling = readNode(parent_node.child_offset[index + 1]);
       int start = node.kv_num;
       for (int i = 0; i < right_sibling.kv_num; ++i) {
         node.keyvalues[start + i] = right_sibling.keyvalues[i];
@@ -545,7 +542,7 @@ private:
       node.kv_num += right_sibling.kv_num;
       node.next = right_sibling.next;
       if (right_sibling.next != -1) {
-        IndexNode<T> nextleaf = readNode(right_sibling.next);
+        IndexNode<T, SIZE> nextleaf = readNode(right_sibling.next);
         nextleaf.prev = node.offset;
         writeNode(nextleaf);
       }
@@ -572,17 +569,17 @@ private:
     }
   }
 
-  void mergeInt(IndexNode<T>& node) {
+  void mergeInt(IndexNode<T, SIZE>& node) {
     if (node.parent == -1) {
       if (node.kv_num == 0 && node.child_offset[0] != -1) {
         basic_info.root = node.child_offset[0];
-        IndexNode<T> child = readNode(node.child_offset[0]);
+        IndexNode<T, SIZE> child = readNode(node.child_offset[0]);
         child.parent = -1;
         writeNode(child);
       }
       return;
     }
-    IndexNode<T> parent_node = readNode(node.parent);
+    IndexNode<T, SIZE> parent_node = readNode(node.parent);
     int index = -1;
     for (int i = 0; i <= parent_node.kv_num; ++i) {
       if (parent_node.child_offset[i] == node.offset) {
@@ -592,7 +589,7 @@ private:
     }
     if (index == -1) return;
     if (index > 0) {
-      IndexNode<T> left_sibling = readNode(parent_node.child_offset[index - 1]);
+      IndexNode<T, SIZE> left_sibling = readNode(parent_node.child_offset[index - 1]);
       if (left_sibling.kv_num > (SIZE + 1) / 2) {
         for (int i = node.kv_num; i > 0; --i) {
           node.keyvalues[i] = node.keyvalues[i - 1];
@@ -604,7 +601,7 @@ private:
         parent_node.keyvalues[index - 1] = left_sibling.keyvalues[left_sibling.kv_num - 1];
         node.kv_num++;
         left_sibling.kv_num--;
-        IndexNode<T> child = readNode(node.child_offset[0]);
+        IndexNode<T, SIZE> child = readNode(node.child_offset[0]);
         child.parent = node.offset;
         writeNode(child);
         writeNode(left_sibling);
@@ -614,7 +611,7 @@ private:
       }
     }
     if (index <= parent_node.kv_num) {
-      IndexNode<T> right_sibling = readNode(parent_node.child_offset[index + 1]);
+      IndexNode<T, SIZE> right_sibling = readNode(parent_node.child_offset[index + 1]);
       if (right_sibling.kv_num > (SIZE + 1) / 2) {
         node.keyvalues[node.kv_num] = parent_node.keyvalues[index];
         node.child_offset[node.kv_num + 1] = right_sibling.child_offset[0];
@@ -626,7 +623,7 @@ private:
         }
         right_sibling.child_offset[right_sibling.kv_num - 1] = right_sibling.child_offset[right_sibling.kv_num];
         right_sibling.kv_num--;
-        IndexNode<T> child = readNode(node.child_offset[node.kv_num]);
+        IndexNode<T, SIZE> child = readNode(node.child_offset[node.kv_num]);
         child.parent = node.offset;
         writeNode(child);
         writeNode(right_sibling);
@@ -636,7 +633,7 @@ private:
       }
     }
     if (index > 0) {
-      IndexNode<T> left_sibling = readNode(parent_node.child_offset[index - 1]);
+      IndexNode<T, SIZE> left_sibling = readNode(parent_node.child_offset[index - 1]);
       int start = left_sibling.kv_num;
       left_sibling.keyvalues[start] = parent_node.keyvalues[index - 1];
       left_sibling.kv_num++;
@@ -645,7 +642,7 @@ private:
       }
       for (int i = 0; i <= node.kv_num; ++i) {
         left_sibling.child_offset[left_sibling.kv_num + i] = node.child_offset[i];
-        IndexNode<T> child = readNode(node.child_offset[i]);
+        IndexNode<T, SIZE> child = readNode(node.child_offset[i]);
         child.parent = left_sibling.offset;
         writeNode(child);
       }
@@ -671,7 +668,7 @@ private:
         mergeNode(parent_node);
       }
     } else if (index <= parent_node.kv_num) {
-      IndexNode<T> right_sibling = readNode(parent_node.child_offset[index + 1]);
+      IndexNode<T, SIZE> right_sibling = readNode(parent_node.child_offset[index + 1]);
       int start = node.kv_num;
       node.keyvalues[start] = parent_node.keyvalues[index];
       node.kv_num++;
@@ -680,7 +677,7 @@ private:
       }
       for (int i = 0; i <= right_sibling.kv_num; ++i) {
         node.child_offset[node.kv_num + i] = right_sibling.child_offset[i];
-        IndexNode<T> child = readNode(right_sibling.child_offset[i]);
+        IndexNode<T, SIZE> child = readNode(right_sibling.child_offset[i]);
         child.parent = node.offset;
         writeNode(child);
       }
@@ -709,7 +706,7 @@ private:
     updateInfo();
   }
 
-  void mergeNode(IndexNode<T>& node) {
+  void mergeNode(IndexNode<T, SIZE>& node) {
     //std::cout << "merge" << std::endl;
     if (node.is_leaf) mergeLeaf(node);
     else mergeInt(node);
@@ -744,12 +741,12 @@ public:
     if (find_pair(key, value)) return;
     KeyValue<T> kv(key, value);
     if (basic_info.total_num == 0) {
-      IndexNode<T> root;
+      IndexNode<T, SIZE> root;
       root.is_leaf = true;
       root.kv_num = 1;
       root.keyvalues[0] = kv;
       root.offset = basic_info.write_offset;
-      basic_info.write_offset += sizeof(IndexNode<T>);
+      basic_info.write_offset += sizeof(IndexNode<T, SIZE>);
       basic_info.root = root.offset;
       basic_info.total_num = 1;
       writeNode(root);
@@ -797,7 +794,7 @@ public:
       return false;
     }
     KeyValue<T> kv(key, value);
-    IndexNode<T> cur = readNode(basic_info.root);
+    IndexNode<T, SIZE> cur = readNode(basic_info.root);
     while (cur.is_leaf == false) {
       int idx = 0;
       while (idx < cur.kv_num && kv >= cur.keyvalues[idx]) {
@@ -828,7 +825,7 @@ public:
     if (basic_info.total_num == 0) {
       return ans;
     }
-    IndexNode<T> cur = readNode(basic_info.root);
+    IndexNode<T, SIZE> cur = readNode(basic_info.root);
     while (cur.is_leaf == false) {
       int idx = 0;
       while (idx < cur.kv_num && key >= cur.keyvalues[idx].key) {
@@ -846,10 +843,10 @@ public:
         break;
       }
     }
-    IndexNode<T> temp_cur = cur;
+    IndexNode<T, SIZE> temp_cur = cur;
     while (true) {
       if (cur.next != -1) {
-        IndexNode<T> next_node = readNode(cur.next);
+        IndexNode<T, SIZE> next_node = readNode(cur.next);
         if (next_node.kv_num > 0 && next_node.keyvalues[0].key == key) {
           cur = next_node;
           for (int i = 0; i < cur.kv_num; ++i) {
@@ -870,7 +867,7 @@ public:
     cur = temp_cur;
     while (true) {
       if (cur.prev != -1) {
-        IndexNode<T> prev_node = readNode(cur.prev);
+        IndexNode<T, SIZE> prev_node = readNode(cur.prev);
         if (prev_node.kv_num > 0 && prev_node.keyvalues[prev_node.kv_num - 1].key == key) {
           cur = prev_node;
           for (int i = prev_node.kv_num - 1; i >= 0; --i) {
@@ -896,7 +893,7 @@ public:
     if (basic_info.total_num == 0) {
       return ans;
     }
-    IndexNode<T> cur = readNode(basic_info.root);
+    IndexNode<T, SIZE> cur = readNode(basic_info.root);
     while (cur.is_leaf == false) {
       int left = 0;
       int right = cur.kv_num;
@@ -917,7 +914,7 @@ public:
         if (cur.keyvalues[idx].key == key) ans.push_back(cur.keyvalues[idx].value);
         idx++;
       } else if (idx >= cur.kv_num) {
-        IndexNode<T> next_node = readNode(cur.next);
+        IndexNode<T, SIZE> next_node = readNode(cur.next);
         if (next_node.kv_num > 0 && next_node.keyvalues[0].key <= key) {
           cur = next_node;
           idx = 0;
@@ -932,6 +929,48 @@ public:
     }
     return ans;
   }
+
+  void modify_single(const Key& key, const T& new_value) {
+    if (basic_info.total_num == 0) {
+      return;
+    }
+    IndexNode<T, SIZE> cur = readNode(basic_info.root);
+    while (cur.is_leaf == false) {
+      int left = 0;
+      int right = cur.kv_num;
+      while (left < right) {
+        int mid = left + (right - left) / 2;
+        if (key > cur.keyvalues[mid].key) {
+          left = mid + 1;
+        } else {
+          right = mid;
+        }
+      }
+      int idx = left; 
+      cur = readNode(cur.child_offset[idx]);
+    }
+    int idx = 0;
+    while (true) {
+      if (idx < cur.kv_num && cur.keyvalues[idx].key <= key) {
+        if (cur.keyvalues[idx].key == key) {
+          cur.keyvalues[idx].value = new_value;
+          writeNode(cur);
+          return;
+        }
+        idx++;
+      } else if (idx >= cur.kv_num) {
+        IndexNode<T, SIZE> next_node = readNode(cur.next);
+        if (next_node.kv_num > 0 && next_node.keyvalues[0].key <= key) {
+          cur = next_node;
+          idx = 0;
+        } else {
+          break;
+        }
+      } else {
+        break;
+      }
+    }
+  }
  
 
   //删除key和对应的value
@@ -940,7 +979,7 @@ public:
       return false;
     }
     KeyValue<T> kv(key, value);
-    IndexNode<T> cur = readNode(basic_info.root);
+    IndexNode<T, SIZE> cur = readNode(basic_info.root);
     while (cur.is_leaf == false) {
       int left = 0, right = cur.kv_num;
       while (left < right) {
@@ -1023,7 +1062,7 @@ public:
   }
 
   void print_node(int node_offset, int depth) {
-    IndexNode<T> node = readNode(node_offset);
+    IndexNode<T, SIZE> node = readNode(node_offset);
     
     // 打印缩进和节点类型
     for (int i = 0; i < depth; ++i) std::cout << "│   ";
@@ -1050,7 +1089,7 @@ public:
 void print_leaves() {
   std::cout << "\nLeaf Linked List: ";
   if (basic_info.root == -1) return;
-  IndexNode<T> cur = readNode(basic_info.root);
+  IndexNode<T, SIZE> cur = readNode(basic_info.root);
   while (!cur.is_leaf) {
     cur = readNode(cur.child_offset[0]);
   }
@@ -1061,7 +1100,7 @@ void print_leaves() {
       if (i != cur.kv_num - 1) std::cout << ",";
     }
     std::cout << ") -> ";
-    cur = (cur.next != -1) ? readNode(cur.next) : IndexNode<T>();
+    cur = (cur.next != -1) ? readNode(cur.next) : IndexNode<T, SIZE>();
   }
   std::cout << "END" << std::endl;
 }

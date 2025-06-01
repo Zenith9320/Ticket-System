@@ -1,6 +1,6 @@
-#include "/home/entong/Ticket-System/src/TrainSystem.hpp"
-#include "/home/entong/Ticket-System/src/UserSystem.hpp"
-#include "/home/entong/Ticket-System/src/utils.hpp"
+#include "src/TrainSystem.hpp"
+#include "src/UserSystem.hpp"
+#include "src/utils.hpp"
 using std::cout;
 using std::string;
 using std::stringstream;

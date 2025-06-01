@@ -104,7 +104,6 @@ public:
       } else {
         auto cur_it = userDB.find_all(Key(cur_username.c_str()));
         if (cur_it.empty() || cur_it[0].privilege <= privilege || login_users.find(username) != login_users.end()) {
-          cout << cur_it[0].privilege << ' ' << privilege << endl;
           return -1;
         }
         account new_account(username, password, realname, mailAddr, privilege);

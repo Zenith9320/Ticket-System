@@ -6,6 +6,8 @@ using std::string;
 using std::stringstream;
 using std::endl;
 int main() {
+  //freopen("testcases/3.in", "r", stdin);
+  //freopen("testcases/3(1).out", "w", stdout);
   UserSystem userSystem("users_data");
   TrainSystem trainSystem("trains_data", "orders_data", "pending_queue_data", "station_train_map_data");
   string s;

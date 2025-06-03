@@ -8,7 +8,7 @@ using std::string;
 using std::cout;
 using std::endl;
 const int ID_len = 20;             // Train ID length
-const int max_station_num = 25;   // Maximum number of stations a train can have
+const int max_station_num = 30;   // Maximum number of stations a train can have
 const int station_name_len = 30;   // Maximum length of a station name
 
 struct Time {
@@ -696,11 +696,11 @@ public:
           continue;
         }
         Date end_date = add_days(date, train.dates[end_id] - train.leavedates[start_id]);
-        int price = train.prices_sum[end_id] -  train.prices_sum[start_id];
+        int price = train.prices_sum[end_id] - train.prices_sum[start_id];
         int duration = train.arrivetimes[end_id] - train.arrivetimes[start_id];
         duration -= train.stopoverTimes[start_id];
         int seat_num = train.seat_num[delta_date(date)][start_id];
-        //cout << "Date: " << date << " " << train.seat_num[delta_date(date)][start_id] << endl;
+        //cout << "Date: " << date << "station: " << train.stations[start_id] << " " << train.seat_num[delta_date(date)][start_id] << endl;
         Date cur_date = date;
         for (int i = start_id + 1; i < end_id; ++i) {
           cur_date = add_days(date, train.leavedates[i] - train.leavedates[start_id]);
@@ -925,6 +925,11 @@ public:
       cout << -1 << endl;
       return;
     }
+    if (!trainID_ifrelease_map[trainID]) {
+      //cout << "train not released" << endl;
+      cout << -1 << endl;
+      return;
+    }
     bool if_pending = false;
     auto x = trainDB.find_all(Key(trainID.c_str()));
     if (x.empty()) {
@@ -984,7 +989,8 @@ public:
         train.seat_num[delta_date(current_date)][i] -= num;
         //cout << "station:" << train.stations[i] << ' '
         //     << "date:" << current_date << " "
-        //     << "delta seat_num: " << num << endl;
+        //     << "delta seat_num: " << num << " " 
+        //     << "cur seat_num: " << train.seat_num[delta_date(current_date)][i] << endl;
       }
       trainDB.erase(Key(trainID.c_str()), trainDB.find_all(Key(trainID.c_str()))[0]);
       trainDB.insert(Key(trainID.c_str()), train);
@@ -1034,18 +1040,18 @@ public:
   void refund_ticket(string& username, int n) {//要求用户登录的前提下调用
     auto orders = orderDB.find_all(Key(username.c_str()));
     if (orders.empty()) {
-      cout << "no orders found" << endl;
+      //cout << "no orders found" << endl;
       cout << -1 << endl;
       return;
     }
     if (n <= 0 || n > orders.size()) {
-      cout << "out of range" << endl;
+      //cout << "out of range" << endl;
       cout << -1 << endl;
       return;
     }
-    Order& order = orders[n - 1];
+    Order& order = orders[orders.size() - n];
     if (order.status == 2) {
-      cout << "order already refunded" << endl;
+      //cout << "order already refunded" << endl;
       cout << -1 << endl;
       return;
     }
@@ -1080,7 +1086,7 @@ public:
       Date current_date = order.date;
       for (int i = start_id; i < end_id; ++i) {
         train.seat_num[delta_date(current_date)][i] += order.num;
-        current_date = add_days(current_date, train.leavedates[i] - train.leavedates[start_id]);
+        current_date = add_days(order.date, train.leavedates[i] - train.leavedates[start_id]);
       }
       trainDB.modify_single(Key(order.trainID), train);
       order.status = 2;
@@ -1113,7 +1119,7 @@ public:
               flag = false;
               break;
             }
-            current_date1 = add_days(current_date1, train.leavedates[j] - train.leavedates[start_id1]);
+            current_date1 = add_days(pending_order.date, train.leavedates[j] - train.leavedates[start_id1]);
           }
           if (flag) {
             pending_order.status = 0;

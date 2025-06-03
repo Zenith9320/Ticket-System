@@ -40,10 +40,11 @@ string remove_prefix(const string& str) {
 
 void process_command_string(const string command, string target[], int beg_pos) {
   size_t cur = beg_pos;
+  string temp = "";
   for (int i = 0; i < command.size(); ++i) {
-    string temp = "";
     if (command[i] == '|') {
       target[cur] = temp;
+      temp = "";
       cur++;
     } else {
       temp = temp + command[i];
@@ -55,6 +56,17 @@ void process_command_string(const string command, string target[], int beg_pos) 
 }
 
 void process_command_int(const string command, int target[], int beg_pos) {
+  size_t cur = beg_pos;
+  for (int i = 0; i < command.size(); ++i) {
+    if (isdigit(command[i])) {
+      target[cur] = target[cur] * 10 + (command[i] - '0');
+    } else if (command[i] == '|') {
+      cur++;
+    }
+  }
+}
+
+void process_command_long_long(const string command, long long target[], int beg_pos) {
   size_t cur = beg_pos;
   for (int i = 0; i < command.size(); ++i) {
     if (isdigit(command[i])) {

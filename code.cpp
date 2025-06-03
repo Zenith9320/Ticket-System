@@ -6,10 +6,10 @@ using std::string;
 using std::stringstream;
 using std::endl;
 int main() {
-  freopen("/home/entong/Ticket-System/testcases/1.in", "r", stdin);
-  freopen("/home/entong/Ticket-System/testcases/1(1).out", "w", stdout);
+  freopen("/home/entong/Ticket-System/testcases/2.in", "r", stdin);
+  freopen("/home/entong/Ticket-System/testcases/2(1).out", "w", stdout);
   UserSystem userSystem("users_data");
-  TrainSystem trainSystem("trains_data", "orders_data", "pending_queue_data");
+  TrainSystem trainSystem("trains_data", "orders_data", "pending_queue_data", "station_train_map_data");
   string s;
   while (getline(std::cin, s)) {
     string prefix = get_prefix(s);
@@ -117,11 +117,11 @@ int main() {
       stringstream ss(command);
       string trainID;
       int stationNum, seatNum;
-      string stations[max_station_num];
-      int prices[max_station_num];
+      string stations[max_station_num] = {""};
+      long long prices[max_station_num] = {0};
       Time startTime;
-      int travelTimes[max_station_num];
-      int stopoverTimes[max_station_num];
+      int travelTimes[max_station_num] = {0};
+      int stopoverTimes[max_station_num] = {0};
       Period saleDate;
       char type;
       string flag;
@@ -133,18 +133,26 @@ int main() {
         else if (flag == "-n") ss >> stationNum;
         else if (flag == "-s") {
           ss >> all_stations;
+          //cout << "all_stations: " << all_stations << endl;
           process_command_string(all_stations, stations, 0);
+          //for (int i = 0; i < stationNum; i++) {
+          //  cout << "station " << i << ": " << stations[i] << endl;
+          //}
         } else if (flag == "-m") ss >> seatNum;
         else if (flag == "-p") {
           ss >> all_prices;
-          process_command_int(all_prices, prices, 0);
-        } else if (flag == "-t") ss >> startTime.hour >> startTime.minute;
-        else if (flag == "-v") {
+          process_command_long_long(all_prices, prices, 0);
+        } else if (flag == "-x") {
+          string times;
+          ss >> times;
+          startTime = Time(stoi(times.substr(0, 2)), stoi(times.substr(3, 2)));
+        } else if (flag == "-t") {
           ss >> all_travel_times;
           process_command_int(all_travel_times, travelTimes, 0);
         } else if (flag == "-o") {
           ss >> all_stopover_times;
-          process_command_int(all_stopover_times, stopoverTimes, 0);
+          if (all_stopover_times == "_") continue;
+          process_command_int(all_stopover_times, stopoverTimes, 1);
         } else if (flag == "-d") {
           ss >> dates;
           int start_month = (stoi(dates.substr(0, 2)));
@@ -195,9 +203,9 @@ int main() {
       while (ss >> flag) {
         if (flag == "-i") ss >> trainID;
         else if (flag == "-d") {
-          int month, day;
-          ss >> month >> day;
-          date = Date(month, day);
+          string datex;
+          ss >> datex;
+          date = Date(stoi(datex.substr(0, 2)), stoi(datex.substr(3, 2)));
         }
       }
       trainSystem.queryTrain(trainID, date);
@@ -212,12 +220,12 @@ int main() {
       int type;
       ss >> tmp;
       while (ss >> flag) {
-        if (flag == "-f") ss >> fromStation;
+        if (flag == "-s") ss >> fromStation;
         else if (flag == "-t") ss >> toStation;
         else if (flag == "-d") {
-          int month, day;
-          ss >> month >> day;
-          date = Date(month, day);
+          string datex;
+          ss >> datex;
+          date = Date(stoi(datex.substr(0, 2)), stoi(datex.substr(3, 2)));
         } else if (flag == "-p") {
           ss >> flag;
           if (flag == "time") {
@@ -244,9 +252,9 @@ int main() {
         if (flag == "-f") ss >> fromStation;
         else if (flag == "-t") ss >> toStation;
         else if (flag == "-d") {
-          int month, day;
-          ss >> month >> day;
-          date = Date(month, day);
+          string datex;
+          ss >> datex;
+          date = Date(stoi(datex.substr(0, 2)), stoi(datex.substr(3, 2)));
         } else if (flag == "-p") {
           ss >> flag;
           if (flag == "time") {
@@ -275,16 +283,16 @@ int main() {
         else if (flag == "-f") ss >> fromStation;
         else if (flag == "-t") ss >> toStation;
         else if (flag == "-d") {
-          int month, day;
-          ss >> month >> day;
-          date = Date(month, day);
+          string datex;
+          ss >> datex;
+          date = Date(stoi(datex.substr(0, 2)), stoi(datex.substr(3, 2)));
         } else if (flag == "-n") ss >> num;
         else if (flag == "-q") {
           ss >> flag;
           if (flag == "true") {
-            type = 1;
+            type = true;
           } else if (flag == "false") {
-            type = 0;
+            type = false;
           } else {
             continue;
           }

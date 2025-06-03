@@ -6,8 +6,6 @@ using std::string;
 using std::stringstream;
 using std::endl;
 int main() {
-  freopen("/home/entong/Ticket-System/testcases/2.in", "r", stdin);
-  freopen("/home/entong/Ticket-System/testcases/2(1).out", "w", stdout);
   UserSystem userSystem("users_data");
   TrainSystem trainSystem("trains_data", "orders_data", "pending_queue_data", "station_train_map_data");
   string s;

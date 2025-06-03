@@ -497,9 +497,9 @@ struct TrainID {
 
 class TrainSystem {
 private:
-  BPlusTree<Train, 100, 1000> trainDB;
-  BPlusTree<Order, 100, 1000> orderDB; 
-  BPlusTree<TrainID, 100, 1000> station_train_map;
+  BPlusTree<Train, 100, 100> trainDB;
+  BPlusTree<Order, 100, 100> orderDB; 
+  BPlusTree<TrainID, 100, 100> station_train_map;
   Vector<Order> pending_queue;
   
   sjtu::map<string, bool> trainID_ifrelease_map;//存储所有列车的发布情况

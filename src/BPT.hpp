@@ -14,6 +14,8 @@
 using std::string;
 using std::fstream;
 using std::ios;
+using std::cout;
+using std::endl;
 
 const int STR_LEN = 65;
 
@@ -1103,6 +1105,10 @@ void print_leaves() {
     cur = (cur.next != -1) ? readNode(cur.next) : IndexNode<T, SIZE>();
   }
   std::cout << "END" << std::endl;
+}
+
+int get_num() {
+  return basic_info.total_num;
 }
 };
 

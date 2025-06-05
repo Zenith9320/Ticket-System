@@ -84,7 +84,9 @@ private:
   sjtu::map<string, int> login_users;
 public:
   UserSystem() = default;
-  UserSystem(string filename) : userDB(filename) {};
+  UserSystem(string filename) : userDB(filename) {
+    user_num = userDB.get_num();
+  };
   ~UserSystem() = default;
 
   int add_user(string cur_username, string username, string password, string realname, string mailAddr, int privilege) {
@@ -115,13 +117,20 @@ public:
   }
 
   int login(string username, string password) {
-    if (user_num == 0 || !check_username(username.c_str()) 
-        || !check_password(password.c_str())) {
+    if (user_num == 0) {
+      //cout << "there is no user in the system" << endl;
       return -1;
     }
     auto it = userDB.find_all(Key(username.c_str()));
     if (it.empty() || strcmp(it[0].password, password.c_str()) != 0
         || login_users.find(username) != login_users.end()) {
+      if (it.empty()) {
+        //cout << "user not found" << endl;
+      } else if (strcmp(it[0].password, password.c_str()) != 0) {
+        //cout << "password error" << endl;
+      } else {
+        //cout << "user already logged in" << endl;
+      }
       return -1;
     }
     login_users[username] = it[0].privilege;
@@ -215,6 +224,10 @@ public:
 
   bool if_login(string username) {
     return login_users.find(username) != login_users.end();
+  }
+
+  void exit() {
+    login_users.clear();
   }
 };
 #endif

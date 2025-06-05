@@ -6,8 +6,8 @@ using std::string;
 using std::stringstream;
 using std::endl;
 int main() {
-  //freopen("testcases/3.in", "r", stdin);
-  //freopen("testcases/3(1).out", "w", stdout);
+  freopen("testcases/7.in", "r", stdin);
+  freopen("testcases/7(1).out", "w", stdout);
   UserSystem userSystem("users_data");
   TrainSystem trainSystem("trains_data", "orders_data", "pending_queue_data", "station_train_map_data");
   string s;
@@ -19,8 +19,8 @@ int main() {
     //exit
     if (command.substr(0, 4) == "exit") {
       cout << "bye" << endl;
-      userSystem.clear();
-      trainSystem.clear();
+      userSystem.exit();
+      trainSystem.upload_timestamp();
       return 0;
     }
 
@@ -217,7 +217,7 @@ int main() {
       stringstream ss(command);
       string trainID, fromStation, toStation, tmp, flag;
       Date date;
-      int type;
+      int type = 1;
       ss >> tmp;
       while (ss >> flag) {
         if (flag == "-s") ss >> fromStation;
@@ -229,9 +229,9 @@ int main() {
         } else if (flag == "-p") {
           ss >> flag;
           if (flag == "time") {
-            type = 0; // 按时间排序
-          } else if (flag == "price") {
-            type = 1; // 按价格排序
+            type = 1; // 按时间排序
+          } else if (flag == "cost") {
+            type = 0; // 按价格排序
           } else {
             continue;
           }
@@ -246,10 +246,10 @@ int main() {
       stringstream ss(command);
       string fromStation, toStation, tmp, flag;
       Date date;
-      int type;
+      int type = 1;
       ss >> tmp;
       while (ss >> flag) {
-        if (flag == "-f") ss >> fromStation;
+        if (flag == "-s") ss >> fromStation;
         else if (flag == "-t") ss >> toStation;
         else if (flag == "-d") {
           string datex;
@@ -258,9 +258,9 @@ int main() {
         } else if (flag == "-p") {
           ss >> flag;
           if (flag == "time") {
-            type = 0;
+            type =  1;
           } else if (flag == "price") {
-            type = 1;
+            type = 0;
           } else {
             continue;
           }
@@ -276,7 +276,8 @@ int main() {
       string trainID, fromStation, toStation, tmp, flag, userID;
       Date date;
       int num;
-      bool type;
+      bool type = false;
+      bool if_login = true;
       ss >> tmp;
       while (ss >> flag) {
         if (flag == "-i") ss >> trainID;
@@ -300,10 +301,11 @@ int main() {
           ss >> userID;
           if (!userSystem.if_login(userID)) {
             cout << -1 << endl;
-            continue;
+            if_login = false;
           }
         }
       }
+      if (!if_login) continue;
       trainSystem.buy_ticket(userID, trainID, date, fromStation, toStation, num, type);
       continue;
     }
@@ -317,6 +319,7 @@ int main() {
         if (flag == "-u") ss >> username;
       }
       if (!userSystem.if_login(username)) {
+        //cout << "not login" << endl;
         cout << -1 << endl;
         continue;
       }

@@ -158,6 +158,7 @@ struct Train {
   Period saleDate;
   char type;
   int seat_num[100][max_station_num];//记录某个站在某一天驶向下一站的座位余量
+  bool if_release = false;
 
   Train() = default;
 
@@ -217,12 +218,15 @@ struct brief_transfer_info {
   int time_B = -1;
   int price_B = -1;
   int seat_num_B = -1;
+  Time arriveTime_A;
+  Time arriveTime_B;
 
   brief_transfer_info() = default;
   brief_transfer_info(const char* id_A, Time sts_A, int t_A, int p_A, int s_A,
-                      const char* id_B, Time sts_B, int t_B, int p_B, int s_B)
+                      const char* id_B, Time sts_B, int t_B, int p_B, int s_B,
+                      Time arv_A, Time arv_B)
   : startTime_A(sts_A), time_A(t_A), price_A(p_A), seat_num_A(s_A),
-    startTime_B(sts_B), time_B(t_B), price_B(p_B), seat_num_B(s_B) {
+    startTime_B(sts_B), time_B(t_B), price_B(p_B), seat_num_B(s_B), arriveTime_A(arv_A), arriveTime_B(arv_B) {
     strncpy(trainID_A, id_A, ID_len);
     trainID_A[ID_len] = '\0';
     strncpy(trainID_B, id_B, ID_len);
@@ -411,7 +415,12 @@ Date add_days(Date date, int days) {//返回date经过days天之后的日期
 int get_day(Time start_time, int travel_time) {//从start_time开始经过travel_time分钟之后的天数
   if (travel_time <= 0) return 0;
   int total_minutes = start_time.hour * 60 + start_time.minute + travel_time;
-  return total_minutes / (24 * 60);
+  int res = 0;
+  while (total_minutes >= 1440) {
+    res++;
+    total_minutes -= 1440;
+  }
+  return res;
 }
 
 int delta_time(Time& start_time, Time& end_time) {//计算从start_time到end_time的时间差（分钟）
@@ -501,16 +510,22 @@ private:
   BPlusTree<Order, 100, 10> orderDB; 
   BPlusTree<TrainID, 100, 10> station_train_map;
   Vector<Order> pending_queue;
-  
-  sjtu::map<string, bool> trainID_ifrelease_map;//存储所有列车的发布情况
-  sjtu::map<string, int> release_trainID_map;//只存储已经发布的列车ID
+  string timestamp_file = "timestamp";
 
   long long order_timestamp = 0; // 用于生成订单ID
 public:
   TrainSystem() = default;
   ~TrainSystem() = default;
   TrainSystem(const string& filename1, const string& filename2, const string& filename3, const string filename4) 
-             : trainDB(filename1), orderDB(filename2), pending_queue(filename3), station_train_map(filename4) {};
+             : trainDB(filename1), orderDB(filename2), pending_queue(filename3), station_train_map(filename4) {
+               fstream file(timestamp_file, ios::in | ios::out | ios::binary);
+               if (!file.is_open()) {
+                 file.open(timestamp_file, ios::out | ios::binary);
+                 order_timestamp = 0; // 初始化订单时间戳
+               } else {
+                 file.read(reinterpret_cast<char*>(&order_timestamp), sizeof(order_timestamp));
+               }
+             };
 
   int addTrain(const string& trainID, int stationNum, 
                const string stations[], int seatNum, 
@@ -549,6 +564,7 @@ public:
     }
     newTrain.startTime = startTime;
     Time cur_time = startTime;
+    Time cur_time1 = startTime;
     int duration = 0;
     for (int i = 0; i < stationNum; ++i) {
       //cout << cur_time << endl;
@@ -556,20 +572,18 @@ public:
         duration += travelTimes[i - 1] + stopoverTimes[i - 1];
       }
       newTrain.travelTimes[i] = travelTimes[i];
-      newTrain.stopoverTimes[i] = stopoverTimes[i];
+      if (i >= 1 && i < stationNum) newTrain.stopoverTimes[i] = stopoverTimes[i];
       newTrain.dates[i] = (i == 0) ? 0 : newTrain.dates[i - 1];
       if (i > 0) {
         newTrain.dates[i] += get_day(cur_time, travelTimes[i - 1] + stopoverTimes[i - 1]);
       }
       newTrain.leavedates[i] = (i == 0) ? 0 : newTrain.leavedates[i - 1];
       if (i > 0) {
-        newTrain.leavedates[i] += get_day(cur_time, travelTimes[i - 1] + stopoverTimes[i - 1] + stopoverTimes[i]);
+        newTrain.leavedates[i] += get_day(cur_time1, travelTimes[i - 1] + stopoverTimes[i]);
       }
       Date temp;
-      //cout << "cur_time before add: " << cur_time << endl;
-      //cout << "add:" << travelTimes[i - 1] + stopoverTimes[i - 1] << endl;
       if (i > 0) add_time(temp, cur_time, travelTimes[i - 1] + stopoverTimes[i - 1]);
-      //cout << "cur_time after add: " << cur_time << endl;
+      if (i > 0) add_time(temp, cur_time1, travelTimes[i - 1] + stopoverTimes[i]);
       newTrain.arrivetimes[i] = duration;
     }
     newTrain.saleDate = saleDate;
@@ -583,7 +597,6 @@ public:
     //for (int i = 0; i < newTrain.stationNum; ++i) {
     //  cout << "prices_sum[" << i << "] = " << newTrain.prices_sum[i] << endl;
     //}
-    trainID_ifrelease_map[trainID] = false;
     //cout << "dates: " << endl;
     //for (int i = 0; i < newTrain.stationNum; ++i) {
     //  cout << newTrain.dates[i] << " ";
@@ -598,26 +611,23 @@ public:
   }
 
   int releaseTrain(string& trainID) {
-    if (trainID_ifrelease_map[trainID]) {
+    Train train = trainDB.find_all(Key(trainID.c_str()))[0];
+    if (train.if_release) {
       return -1;
     }
-    trainID_ifrelease_map[trainID] = true;
-    release_trainID_map[trainID] = 1;
+    trainDB.erase(Key(trainID.c_str()), train);
+    train.if_release = true;
+    trainDB.insert(Key(trainID.c_str()), train);
     return 0;
   }
 
   int deleteTrain(string& trainID) {
-    if (trainID_ifrelease_map.find(trainID) == trainID_ifrelease_map.end()) {
-      return -1;
-    }
-    if (trainID_ifrelease_map[trainID]) {
-      return -1;
-    }
     Key key(trainID.c_str());
-    Train train = trainDB.find_all(key)[0];
+    auto temp = trainDB.find_all(key);
+    if (temp.empty()) return -1;
+    Train train = temp[0];
+    if (train.if_release) return -1;
     trainDB.erase(key, train);
-    trainID_ifrelease_map[trainID] = false;
-    release_trainID_map.erase(release_trainID_map.find(trainID));
     for (int i = 0; i < train.stationNum; ++i) {
       station_train_map.erase(Key(train.stations[i]), TrainID(train.trainID));
     }
@@ -663,12 +673,11 @@ public:
 
   //type: 0 for time, 1 for price
   void query_ticket(string& start_station, string& end_station, Date& date, int type) {
-    auto it = release_trainID_map.begin();
+    //cout << "query ticket" << endl;
     int total = 0;
     if (type == 0) {
       sjtu::map<brief_train_info, bool, CompByPrice> result_map;
       auto start_train = station_train_map.find_all(Key(start_station.c_str()));
-      //cout << "start train size: " << start_train.size() << endl;
       for (int i = 0; i < start_train.size(); ++i) {
         int start_id = -1, end_id = -1;
         string trainID = start_train[i].trainID;
@@ -679,6 +688,7 @@ public:
           continue;
         }
         Train train = x[0];
+        if (!train.if_release) continue;
         for (int i = 0; i < train.stationNum; ++i) {
           if (strcmp(train.stations[i], start_station.c_str()) == 0) {
             start_id = i;
@@ -727,7 +737,6 @@ public:
     } else if (type == 1) {
       sjtu::map<brief_train_info, bool, CompByTime> result_map;
       auto start_train = station_train_map.find_all(Key(start_station.c_str()));
-      //cout << "start train size: " << start_train.size() << endl;
       for (int i = 0; i < start_train.size(); ++i) {
         int start_id = -1, end_id = -1;
         string trainID = start_train[i].trainID;
@@ -738,6 +747,7 @@ public:
           continue;
         }
         Train train = x[0];
+        if (!train.if_release) continue;
         for (int i = 0; i < train.stationNum; ++i) {
           if (strcmp(train.stations[i], start_station.c_str()) == 0) {
             start_id = i;
@@ -755,15 +765,16 @@ public:
           continue;
         }
         Date end_date = add_days(date, train.dates[end_id] - train.leavedates[start_id]);
-        int price = train.prices_sum[end_id] -  train.prices_sum[start_id];
+        int price = train.prices_sum[end_id] - train.prices_sum[start_id];
         int duration = train.arrivetimes[end_id] - train.arrivetimes[start_id];
         duration -= train.stopoverTimes[start_id];
         int seat_num = train.seat_num[delta_date(date)][start_id];
+        //cout << "Date: " << date << "station: " << train.stations[start_id] << " " << train.seat_num[delta_date(date)][start_id] << endl;
         Date cur_date = date;
         for (int i = start_id + 1; i < end_id; ++i) {
-          //cout << "Date: " << cur_date << " " << train.seat_num[delta_date(cur_date)][i] << endl;
           cur_date = add_days(date, train.leavedates[i] - train.leavedates[start_id]);
           seat_num = std::min(seat_num, train.seat_num[delta_date(cur_date)][i]);
+          //cout << "Date: " << cur_date << " " << "station: " << train.stations[i] << " " << train.seat_num[delta_date(cur_date)][i] << endl;
         }
         if (seat_num <= 0) {
           //cout << "no seat available" << endl;
@@ -794,9 +805,11 @@ public:
     auto beg_train = station_train_map.find_all(Key(start_station.c_str()));
     auto end_train = station_train_map.find_all(Key(end_station.c_str()));
     if (beg_train.empty()) {
+      //cout << "no train from the beg station" << endl;
       cout << 0 << endl;
       return;
     }
+    bool if_found = false;
     for (int xx = 0; xx < beg_train.size(); ++xx) {
       string trainA_id = beg_train[xx].trainID;
       auto x = trainDB.find_all(Key(trainA_id.c_str()));
@@ -814,8 +827,14 @@ public:
           continue;
         }
 
+        Time A_leave_time = A.startTime;
+        Date temp;
+        add_time(temp, A_leave_time, A.arrivetimes[i] + A.stopoverTimes[i]);
+
         for (int mid = i + 1; mid < A.stationNum; ++mid) {//枚举中转站mid
-          depA = add(A.arrivetimes[mid] - (i > 0 ? A.arrivetimes[i] : 0) - A.stopoverTimes[i], A.startTime);
+          Date temp;
+          depA = A.startTime;
+          add_time(temp, depA, A.arrivetimes[mid]);
           int priceA = A.prices_sum[mid] - (i > 0 ? A.prices_sum[i] : 0);
           int durationA = A.arrivetimes[mid] - (i > 0 ? A.arrivetimes[i] : 0);
           durationA -= A.stopoverTimes[i];
@@ -830,7 +849,6 @@ public:
           Date cur_date = add_days(date, A.dates[mid] - A.leavedates[i]);
           auto mid_train = station_train_map.find_all(Key(A.stations[mid]));
           if (mid_train.empty()) continue;
-          
           for (int it2 = 0; it2 < mid_train.size(); ++it2) {//枚举第二列车
             string trainB_id = mid_train[it2].trainID;
             if (trainB_id == trainA_id) continue;
@@ -841,11 +859,12 @@ public:
               if (strcmp(B.stations[t], end_station.c_str()) == 0) end_j = t;
             }
             if (j < 0 || end_j < 0 || j >= end_j) continue;
+            Time B_leave_time = B.startTime;
+            Date temp;
+            add_time(temp, B_leave_time, B.arrivetimes[j] + B.stopoverTimes[j]);
             Time depB = B.startTime;
+            add_time(temp, depB, B.arrivetimes[end_j]);
             Date dateB = date;
-            for (int t = 0; t < j; ++t) {
-              add_time(dateB, depB, B.stopoverTimes[t] + B.travelTimes[t]);
-            }
             Date min_arrive_date = add_days(B.saleDate.startTime, B.leavedates[j]);//第二辆列车到达j的最早日期
             Date leave_date = min_arrive_date < (cur_date + (depA > depB ? Date(0, 1) : Date(0, 0))) ? 
                               (depA > depB ? add_days(cur_date, 1) : cur_date) : min_arrive_date;
@@ -878,21 +897,22 @@ public:
             int total_duration = durationA + durationB + delta_time_trans;
             int total_seat = std::min(seatA, seatB);
             // 用 A.startTime 作排序基准
-            brief_transfer_info info(trainA_id.c_str(), depA, durationA, priceA, seatA,
-                                  trainB_id.c_str(), depB, durationB, priceB, seatB);
+            brief_transfer_info info(trainA_id.c_str(), A_leave_time, durationA, priceA, seatA,
+                                  trainB_id.c_str(), B_leave_time, durationB, priceB, seatB, depA, depB);
+            if_found = true;
             if (result.trainID_A[0] == '\0') {
               result = info;
               mid_station = A.stations[mid];
               arrive_date = add_days(leave_date, B.dates[end_j] - B.leavedates[j]);
               mid_date = cur_date;
               mid_date1 = leave_date;
-            } else if (TransCompByTime()(info, result) && type == 0) {
+            } else if (TransCompByTime()(info, result) && type == 1) {
               result = info;
               mid_station = A.stations[mid];
               arrive_date = add_days(leave_date, B.dates[end_j] - B.leavedates[j]);
               mid_date = cur_date;
               mid_date1 = leave_date;
-            } else if (TransCompByPrice()(info, result) && type == 1) {
+            } else if (TransCompByPrice()(info, result) && type == 0) {
               result = info;
               mid_station = A.stations[mid];
               arrive_date = add_days(leave_date, B.dates[end_j] - B.leavedates[j]);
@@ -903,14 +923,16 @@ public:
         }
       }
     }
-    if (result.trainID_A[0] == '\0') cout << 0 << endl;
-    else {
+    if (!if_found) {
+      //cout << "no trains found" << endl;
+      cout << 0 << endl;
+    } else {
       cout << result.trainID_A << " " << start_station << " " << date << " "
            << result.startTime_A << " -> " << mid_station << " "
-           << mid_date << " " << result.price_A << " " << result.seat_num_A << endl;
+           << mid_date << " " << result.arriveTime_A << " " << result.price_A << " " << result.seat_num_A << endl;
       cout << result.trainID_B << " " << mid_station << " " << mid_date1 << " "
            << result.startTime_B << " -> " << end_station << " "
-           << arrive_date << " " << result.price_B << " " << result.seat_num_B << endl;
+           << arrive_date << " " << result.arriveTime_B << " " << result.price_B << " " << result.seat_num_B << endl;
     }
   }
 
@@ -920,23 +942,18 @@ public:
     //     << trainID << " " << date << " " 
     //     << start_station << " -> " 
     //     << end_station << " " << num << endl;
-    if (trainID_ifrelease_map.find(trainID) == trainID_ifrelease_map.end()) {
-      //cout << "no such train" << endl;
-      cout << -1 << endl;
-      return;
-    }
-    if (!trainID_ifrelease_map[trainID]) {
-      //cout << "train not released" << endl;
-      cout << -1 << endl;
-      return;
-    }
     bool if_pending = false;
     auto x = trainDB.find_all(Key(trainID.c_str()));
     if (x.empty()) {
       //cout << "train not found in trainDB" << endl;
+      cout << -1 << endl;
       return;
     }
     Train train = x[0];
+    if (!train.if_release) {
+      cout << -1 << endl;
+      return;
+    }
     int start_id = -1, end_id = -1;
     for (int i = 0; i < train.stationNum; ++i) {
       if (strcmp(train.stations[i], start_station.c_str()) == 0) {
@@ -979,15 +996,13 @@ public:
     Date temp;
     Order new_order(trainID.c_str(), leaving_date, arriving_date, 
                       start_station.c_str(), end_station.c_str(), 
-                      leaving_time, arriving_time, total_price / num, num, if_pending ? 1 : 0);
-    new_order.ID = ++order_timestamp; 
-    orderDB.insert(Key(username.c_str()), new_order); 
+                      leaving_time, arriving_time, total_price / num, num, if_pending ? 1 : 0); 
     Date current_date = date;
     if (!if_pending) {//如果成功购票，要更改火车的信息
       for (int i = start_id; i < end_id; ++i) {
         current_date = add_days(date, train.leavedates[i] - train.leavedates[start_id]);
         train.seat_num[delta_date(current_date)][i] -= num;
-        //cout << "station:" << train.stations[i] << ' '
+        //cout << "train: " << train.trainID << "station:" << train.stations[i] << ' '
         //     << "date:" << current_date << " "
         //     << "delta seat_num: " << num << " " 
         //     << "cur seat_num: " << train.seat_num[delta_date(current_date)][i] << endl;
@@ -995,10 +1010,14 @@ public:
       trainDB.erase(Key(trainID.c_str()), trainDB.find_all(Key(trainID.c_str()))[0]);
       trainDB.insert(Key(trainID.c_str()), train);
       cout << total_price << endl;
+      new_order.ID = ++order_timestamp;
+      orderDB.insert(Key(username.c_str()), new_order); 
     } else {
       if (type) {
         pending_queue.push_back(new_order);
         cout << "queue" << endl;
+        new_order.ID = ++order_timestamp;
+        orderDB.insert(Key(username.c_str()), new_order); 
       } else {
         cout << "-1" << endl;
       }
@@ -1069,6 +1088,7 @@ public:
       cout << 0 << endl;
       return;
     } else if (order.status == 0) {//如果已经成功购票，需要更改火车座位信息
+      //cout << "already success" << endl;
       Train train = trainDB.find_all(Key(order.trainID))[0];
       int start_id = -1, end_id = -1;
       for (int i = 0; i < train.stationNum; ++i) {
@@ -1084,13 +1104,19 @@ public:
         return;
       }
       Date current_date = order.date;
+      trainDB.erase(train.trainID, train);
       for (int i = start_id; i < end_id; ++i) {
-        train.seat_num[delta_date(current_date)][i] += order.num;
         current_date = add_days(order.date, train.leavedates[i] - train.leavedates[start_id]);
+        train.seat_num[delta_date(current_date)][i] += order.num;
+        //cout << "train: " << train.trainID << "station:" << train.stations[i] << ' '
+        //     << "date:" << current_date << " "
+        //     << "delta seat_num: " << order.num << " " 
+        //     << "cur seat_num: " << train.seat_num[delta_date(current_date)][i] << endl;
       }
-      trainDB.modify_single(Key(order.trainID), train);
+      trainDB.insert(train.trainID, train);
+      orderDB.erase(Key(username.c_str()), order);
       order.status = 2;
-      orderDB.modify_single(Key(username.c_str()), order);
+      orderDB.insert(Key(username.c_str()), order);
 
       //检查pending_queue中是否有候补订单可以完成
       for (int i = 0; i < pending_queue.size(); ++i) {
@@ -1098,7 +1124,7 @@ public:
         if (pending_order.status == 2 || pending_order.status == 0) {
           continue;
         }
-        if (pending_order.trainID == order.trainID) {
+        if (strcmp(pending_order.trainID, order.trainID) == 0) {
           bool flag = true;
           Train train = trainDB.find_all(Key(pending_order.trainID))[0];
           int start_id1 = -1, end_id1 = -1;
@@ -1115,21 +1141,27 @@ public:
           }
           Date current_date1 = pending_order.date;
           for (int j = start_id1; j < end_id1; ++j) {
+            current_date1 = add_days(pending_order.date, train.leavedates[j] - train.leavedates[start_id1]);
             if (train.seat_num[delta_date(current_date1)][j] < pending_order.num) {
               flag = false;
               break;
             }
-            current_date1 = add_days(pending_order.date, train.leavedates[j] - train.leavedates[start_id1]);
           }
           if (flag) {
+            orderDB.erase(Key(username.c_str()), pending_order);
             pending_order.status = 0;
-            orderDB.modify_single(Key(username.c_str()), pending_order);
+            orderDB.insert(Key(username.c_str()), pending_order);
             current_date1 = pending_order.date;
+            trainDB.erase(Key(pending_order.trainID), train);
             for (int j = start_id1; j < end_id1; ++j) {
+              current_date1 = add_days(pending_order.date, train.leavedates[j] - train.leavedates[start_id1]);
               train.seat_num[delta_date(current_date1)][j] -= pending_order.num;
-              current_date1 = add_days(current_date1, train.leavedates[j] - train.leavedates[start_id1]);
+              //cout << "train: " << train.trainID << "station:" << train.stations[i] << ' '
+              //     << "date:" << current_date << " "
+              //     << "delta seat_num: " << order.num << " " 
+              //     << "cur seat_num: " << train.seat_num[delta_date(current_date)][i] << endl;
             }
-            trainDB.modify_single(Key(pending_order.trainID), train);
+            trainDB.insert(Key(pending_order.trainID), train);
             pending_queue.modify(i, pending_order);
             cout << 0 << endl;
             return;
@@ -1145,9 +1177,15 @@ public:
     trainDB.clear();
     orderDB.clear();
     pending_queue.clear();
-    trainID_ifrelease_map.clear();
-    release_trainID_map.clear();
     order_timestamp = 0;
+  }
+
+  void upload_timestamp() {
+    fstream file(timestamp_file, ios::out | ios::binary);
+    if (file.is_open()) {
+      file.write(reinterpret_cast<const char*>(&order_timestamp), sizeof(order_timestamp));
+      file.close();
+    }
   }
 };
 #endif

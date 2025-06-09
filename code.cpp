@@ -6,8 +6,10 @@ using std::string;
 using std::stringstream;
 using std::endl;
 int main() {
-  freopen("testcases/7.in", "r", stdin);
-  freopen("testcases/7(1).out", "w", stdout);
+  std::ios::sync_with_stdio(false);
+  std::cin.tie(nullptr);
+  //freopen("testcases/29.in", "r", stdin);
+  //freopen("testcases/29(1).out", "w", stdout);
   UserSystem userSystem("users_data");
   TrainSystem trainSystem("trains_data", "orders_data", "pending_queue_data", "station_train_map_data");
   string s;
@@ -259,7 +261,7 @@ int main() {
           ss >> flag;
           if (flag == "time") {
             type =  1;
-          } else if (flag == "price") {
+          } else if (flag == "cost") {
             type = 0;
           } else {
             continue;
@@ -300,12 +302,14 @@ int main() {
         } else if (flag == "-u") {
           ss >> userID;
           if (!userSystem.if_login(userID)) {
-            cout << -1 << endl;
             if_login = false;
           }
         }
       }
-      if (!if_login) continue;
+      if (!if_login) {
+        cout << -1 << endl;
+        continue;
+      };
       trainSystem.buy_ticket(userID, trainID, date, fromStation, toStation, num, type);
       continue;
     }

@@ -108,6 +108,7 @@ public:
         if (cur_it.empty() || cur_it[0].privilege <= privilege || login_users.find(username) != login_users.end()) {
           return -1;
         }
+        if (login_users.find(cur_username) == login_users.end()) return -1;
         account new_account(username, password, realname, mailAddr, privilege);
         userDB.insert(Key(username.c_str()), new_account);
         user_num++;
@@ -159,7 +160,7 @@ public:
     //检查cur的权限是否足够
     if (cur_username != username) {
       auto it = userDB.find_all(Key(username.c_str()));
-      if (login_users[cur_username] <= it[0].privilege) {
+      if (it.empty() || login_users[cur_username] <= it[0].privilege) {
         std::cout << "-1" << std::endl;
         return;
       }
@@ -192,7 +193,7 @@ public:
     //检查cur的权限是否足够
     if (cur_username != username) {
       auto it = userDB.find_all(Key(username.c_str()));
-      if (login_users[cur_username] <= it[0].privilege) {
+      if (it.size() == 0 || login_users[cur_username] <= it[0].privilege) {
         std::cout << "-1" << std::endl;
         return;
       }

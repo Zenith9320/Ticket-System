@@ -931,50 +931,7 @@ public:
     }
     return ans;
   }
-
-  void modify_single(const Key& key, const T& new_value) {
-    if (basic_info.total_num == 0) {
-      return;
-    }
-    IndexNode<T, SIZE> cur = readNode(basic_info.root);
-    while (cur.is_leaf == false) {
-      int left = 0;
-      int right = cur.kv_num;
-      while (left < right) {
-        int mid = left + (right - left) / 2;
-        if (key > cur.keyvalues[mid].key) {
-          left = mid + 1;
-        } else {
-          right = mid;
-        }
-      }
-      int idx = left; 
-      cur = readNode(cur.child_offset[idx]);
-    }
-    int idx = 0;
-    while (true) {
-      if (idx < cur.kv_num && cur.keyvalues[idx].key <= key) {
-        if (cur.keyvalues[idx].key == key) {
-          cur.keyvalues[idx].value = new_value;
-          writeNode(cur);
-          return;
-        }
-        idx++;
-      } else if (idx >= cur.kv_num) {
-        IndexNode<T, SIZE> next_node = readNode(cur.next);
-        if (next_node.kv_num > 0 && next_node.keyvalues[0].key <= key) {
-          cur = next_node;
-          idx = 0;
-        } else {
-          break;
-        }
-      } else {
-        break;
-      }
-    }
-  }
  
-
   //删除key和对应的value
   bool erase(const Key& key, const T& value) {
     if (basic_info.total_num == 0) {
@@ -1042,6 +999,72 @@ public:
       //std::cout << "merge" << std::endl;
       mergeNode(cur);
     }
+    updateInfo();
+    return true;
+  }
+
+  bool erase_without_merge(const Key& key, const T& value) {
+    if (basic_info.total_num == 0) {
+      return false;
+    }
+    KeyValue<T> kv(key, value);
+    IndexNode<T, SIZE> cur = readNode(basic_info.root);
+    while (cur.is_leaf == false) {
+      int left = 0, right = cur.kv_num;
+      while (left < right) {
+        int mid = left + (right - left) / 2;
+        if (kv >= cur.keyvalues[mid]) {
+          left = mid + 1;
+        } else {
+          right = mid;
+        }
+      }
+      int idx = left;
+      cur = readNode(cur.child_offset[idx]);
+    }
+    int ErasePos = -1;
+    int left = 0, right = cur.kv_num - 1;
+    while (left <= right) {
+      int mid = (left + right) / 2;
+      if (cur.keyvalues[mid] == kv) {
+        ErasePos = mid;
+        break;
+      } else if (cur.keyvalues[mid] < kv) {
+        left = mid + 1;
+      } else {
+        right = mid - 1;
+      }
+    }
+    if (ErasePos == -1) {
+      cur = readNode(cur.prev);
+      if (cur.keyvalues[cur.kv_num - 1] == kv) {
+        ErasePos = cur.kv_num - 1;
+      }
+    }
+    if (ErasePos == -1) {
+      //std::cout << "pair not found" << std::endl;
+      return false;
+    }
+    /*std::cout << "erase node:" << std::endl;
+    for (int i = 0; i < cur.kv_num; ++i) {
+      std::cout << cur.keyvalues[i] << " ";
+    }
+    std::cout << std::endl;
+    std::cout << "ErasePos: " << ErasePos << std::endl;*/
+    for (int i = ErasePos; i < cur.kv_num - 1; ++i) {
+      cur.keyvalues[i] = cur.keyvalues[i + 1];
+      cur.child_offset[i] = cur.child_offset[i + 1];
+    }
+    if (cur.kv_num != 0) {
+      cur.keyvalues[cur.kv_num - 1] = KeyValue<T>();
+      cur.child_offset[cur.kv_num - 1] = -1;
+    }
+    --cur.kv_num;
+    --basic_info.total_num;
+    if (basic_info.total_num == 0) {
+      basic_info.root = -1;
+    }
+    writeNode(cur);
     updateInfo();
     return true;
   }

@@ -430,6 +430,7 @@ int delta_time(Time& start_time, Time& end_time) {//计算从start_time到end_ti
 }
 
 struct Order {
+  char userID[21];
   char trainID[ID_len + 1];
   Date date;
   Date arriveDate;
@@ -443,13 +444,16 @@ struct Order {
   int ID = 0;
 
   Order() : date(), leavingTime(), arrivingTime(), price(0), num(0), status(0) {
+    userID[0] = '\0';
     trainID[0] = '\0';
     startStation[0] = '\0';
     endStation[0] = '\0';
   }
   Order(const char* id, Date d, Date ad, const char* start, const char* end, 
-        Time leave, Time arrive, int p, int n, int s)
+        Time leave, Time arrive, int p, int n, int s, const char* uID)
   : date(d), arriveDate(ad), leavingTime(leave), arrivingTime(arrive), price(p), num(n), status(s) {
+    strncpy(userID, uID, 20);
+    userID[20] = '\0';
     strncpy(trainID, id, ID_len);
     trainID[ID_len] = '\0';
     strncpy(startStation, start, station_name_len);
@@ -615,7 +619,7 @@ public:
     if (train.if_release) {
       return -1;
     }
-    trainDB.erase(Key(trainID.c_str()), train);
+    trainDB.erase_without_merge(Key(trainID.c_str()), train);
     train.if_release = true;
     trainDB.insert(Key(trainID.c_str()), train);
     return 0;
@@ -818,6 +822,7 @@ public:
         continue;
       }
       Train A = x[0];
+      //cout << "checking the first train: " << trainA_id << endl;
       Time depA = A.startTime;
       for (int i = 0; i + 1 < A.stationNum; ++i) {//寻找起始站i
         if (strcmp(A.stations[i], start_station.c_str()) != 0) continue;
@@ -846,13 +851,17 @@ public:
           }
           if (seatA <= 0) continue;
 
-          Date cur_date = add_days(date, A.dates[mid] - A.leavedates[i]);
+          Date cur_date = add_days(date, A.dates[mid] - A.leavedates[i]);//A到达中转站的时间日期
           auto mid_train = station_train_map.find_all(Key(A.stations[mid]));
           if (mid_train.empty()) continue;
           for (int it2 = 0; it2 < mid_train.size(); ++it2) {//枚举第二列车
             string trainB_id = mid_train[it2].trainID;
             if (trainB_id == trainA_id) continue;
-            Train B = trainDB.find_all(Key(trainB_id.c_str()))[0];
+            auto x = trainDB.find_all(Key(trainB_id.c_str()));
+            if (x.empty()) continue;
+            Train B = x[0];
+            if (!B.if_release) continue;
+            //cout << "checking the second train: " << B.trainID << endl;
             int j = -1, end_j = -1;
             for (int t = 0; t < B.stationNum; ++t) {//锁定起始站
               if (strcmp(B.stations[t], A.stations[mid]) == 0) j = t;
@@ -863,11 +872,19 @@ public:
             Date temp;
             add_time(temp, B_leave_time, B.arrivetimes[j] + B.stopoverTimes[j]);
             Time depB = B.startTime;
-            add_time(temp, depB, B.arrivetimes[end_j]);
+            add_time(temp, depB, B.arrivetimes[j] + B.stopoverTimes[j]);
             Date dateB = date;
             Date min_arrive_date = add_days(B.saleDate.startTime, B.leavedates[j]);//第二辆列车到达j的最早日期
-            Date leave_date = min_arrive_date < (cur_date + (depA > depB ? Date(0, 1) : Date(0, 0))) ? 
-                              (depA > depB ? add_days(cur_date, 1) : cur_date) : min_arrive_date;
+            Date leave_date1 = cur_date;
+            if (depA > depB) {
+              leave_date1 = add_days(leave_date1, 1);
+            }
+            Date leave_date;
+            if (leave_date1 < min_arrive_date) {
+              leave_date = min_arrive_date;
+            } else {
+              leave_date = leave_date1;
+            }
             int delta_date1 = 0;
             Date temp_date = cur_date;
             while (leave_date > temp_date) {
@@ -897,28 +914,57 @@ public:
             int total_duration = durationA + durationB + delta_time_trans;
             int total_seat = std::min(seatA, seatB);
             // 用 A.startTime 作排序基准
+            Date temp1;
+            add_time(temp1, depB, B.arrivetimes[end_j] - B.arrivetimes[j] - B.stopoverTimes[j]);
             brief_transfer_info info(trainA_id.c_str(), A_leave_time, durationA, priceA, seatA,
                                   trainB_id.c_str(), B_leave_time, durationB, priceB, seatB, depA, depB);
-            if_found = true;
-            if (result.trainID_A[0] == '\0') {
+            if (info.price_A == -1 || info.price_B == -1 || info.seat_num_A == -1 || info.seat_num_B == -1) continue;
+            if (!if_found) {
               result = info;
               mid_station = A.stations[mid];
               arrive_date = add_days(leave_date, B.dates[end_j] - B.leavedates[j]);
-              mid_date = cur_date;
+              mid_date = add_days(date, A.dates[mid] - A.leavedates[i]);
               mid_date1 = leave_date;
+              //cout << result.trainID_A << " " << start_station << " " << date << " "
+              //     << result.startTime_A << " -> " << mid_station << " "
+              //     << mid_date << " " << result.arriveTime_A << " " << result.price_A << " " << result.seat_num_A << endl;
+              //cout << result.trainID_B << " " << mid_station << " " << mid_date1 << " "
+              //     << result.startTime_B << " -> " << end_station << " "
+              //     << arrive_date << " " << result.arriveTime_B << " " << result.price_B << " " << result.seat_num_B << endl;
             } else if (TransCompByTime()(info, result) && type == 1) {
               result = info;
               mid_station = A.stations[mid];
               arrive_date = add_days(leave_date, B.dates[end_j] - B.leavedates[j]);
-              mid_date = cur_date;
+              mid_date = add_days(date, A.dates[mid] - A.leavedates[i]);
               mid_date1 = leave_date;
+              //cout << result.trainID_A << " " << start_station << " " << date << " "
+              //     << result.startTime_A << " -> " << mid_station << " "
+              //     << mid_date << " " << result.arriveTime_A << " " << result.price_A << " " << result.seat_num_A << endl;
+              //cout << result.trainID_B << " " << mid_station << " " << mid_date1 << " "
+              //     << result.startTime_B << " -> " << end_station << " "
+              //     << arrive_date << " " << result.arriveTime_B << " " << result.price_B << " " << result.seat_num_B << endl;
             } else if (TransCompByPrice()(info, result) && type == 0) {
               result = info;
               mid_station = A.stations[mid];
               arrive_date = add_days(leave_date, B.dates[end_j] - B.leavedates[j]);
-              mid_date = cur_date;
+              mid_date = add_days(date, A.dates[mid] - A.leavedates[i]);
               mid_date1 = leave_date;
+              //cout << result.trainID_A << " " << start_station << " " << date << " "
+              //     << result.startTime_A << " -> " << mid_station << " "
+              //     << mid_date << " " << result.arriveTime_A << " " << result.price_A << " " << result.seat_num_A << endl;
+              //cout << result.trainID_B << " " << mid_station << " " << mid_date1 << " "
+              //     << result.startTime_B << " -> " << end_station << " "
+              //     << arrive_date << " " << result.arriveTime_B << " " << result.price_B << " " << result.seat_num_B << endl;
+            } else {
+              //cout << "error: " << endl;
+              //cout << result.trainID_A << " " << start_station << " " << date << " "
+              //     << result.startTime_A << " -> " << mid_station << " "
+              //     << mid_date << " " << result.arriveTime_A << " " << result.price_A << " " << result.seat_num_A << endl;
+              //cout << result.trainID_B << " " << mid_station << " " << mid_date1 << " "
+              //     << result.startTime_B << " -> " << end_station << " "
+              //     << arrive_date << " " << result.arriveTime_B << " " << result.price_B << " " << result.seat_num_B << endl;
             }
+            if_found = true;
           }
         }
       }
@@ -970,7 +1016,7 @@ public:
       cout << -1 << endl;
       return;
     }
-    if (date > add_days(train.saleDate.endTime, train.leavedates[start_id]) || date < add_days(train.saleDate.startTime, train.dates[start_id])) {
+    if (date > add_days(train.saleDate.endTime, train.leavedates[start_id]) || date < add_days(train.saleDate.startTime, train.leavedates[start_id])) {
       //cout << "date out of range" << endl;
       cout << -1 << endl;
       return;
@@ -996,7 +1042,7 @@ public:
     Date temp;
     Order new_order(trainID.c_str(), leaving_date, arriving_date, 
                       start_station.c_str(), end_station.c_str(), 
-                      leaving_time, arriving_time, total_price / num, num, if_pending ? 1 : 0); 
+                      leaving_time, arriving_time, total_price / num, num, if_pending ? 1 : 0, username.c_str()); 
     Date current_date = date;
     if (!if_pending) {//如果成功购票，要更改火车的信息
       for (int i = start_id; i < end_id; ++i) {
@@ -1007,17 +1053,41 @@ public:
         //     << "delta seat_num: " << num << " " 
         //     << "cur seat_num: " << train.seat_num[delta_date(current_date)][i] << endl;
       }
-      trainDB.erase(Key(trainID.c_str()), trainDB.find_all(Key(trainID.c_str()))[0]);
+      trainDB.erase_without_merge(Key(trainID.c_str()), trainDB.find_all(Key(trainID.c_str()))[0]);
       trainDB.insert(Key(trainID.c_str()), train);
       cout << total_price << endl;
       new_order.ID = ++order_timestamp;
       orderDB.insert(Key(username.c_str()), new_order); 
+      //      cout << "order insert" << endl;
+      //cout << new_order.trainID << " " 
+      //     << new_order.startStation << " " 
+      //     << new_order.date << " " 
+      //     << new_order.leavingTime << " -> "
+      //     << new_order.endStation << " "
+      //     << new_order.arriveDate << " "
+      //     << new_order.arrivingTime << " "
+      //     << new_order.price << " "
+      //     << new_order.num << " "
+      //     << new_order.ID
+      //     << endl;
     } else {
       if (type) {
-        pending_queue.push_back(new_order);
         cout << "queue" << endl;
         new_order.ID = ++order_timestamp;
+        pending_queue.push_back(new_order);
         orderDB.insert(Key(username.c_str()), new_order); 
+        //    cout << "order insert" << endl;
+        //cout << new_order.trainID << " " 
+        //     << new_order.startStation << " " 
+        //     << new_order.date << " " 
+        //     << new_order.leavingTime << " -> "
+        //     << new_order.endStation << " "
+        //     << new_order.arriveDate << " "
+        //     << new_order.arrivingTime << " "
+        //     << new_order.price << " "
+        //     << new_order.num << " "
+        //     << new_order.ID
+        //     << endl;
       } else {
         cout << "-1" << endl;
       }
@@ -1075,8 +1145,21 @@ public:
       return;
     }
     if (order.status == 1) {//如果本来在候补队列中，将状态改变并不做其他任何操作
+      orderDB.erase_without_merge(Key(username.c_str()), order);
       order.status = 2;
-      orderDB.modify_single(Key(username.c_str()), order);
+      orderDB.insert(Key(username.c_str()), order);
+      //      cout << "order insert" << endl;
+      //cout << order.trainID << " " 
+      //     << order.startStation << " " 
+      //     << order.date << " " 
+      //     << order.leavingTime << " -> "
+      //     << order.endStation << " "
+      //     << order.arriveDate << " "
+      //     << order.arrivingTime << " "
+      //     << order.price << " "
+      //     << order.num << " "
+      //     << order.ID
+      //     << endl;
       for (int i = 0; i < pending_queue.size(); ++i) {
         if (pending_queue[i].ID == order.ID) {
           auto temp = pending_queue[i];
@@ -1104,7 +1187,7 @@ public:
         return;
       }
       Date current_date = order.date;
-      trainDB.erase(train.trainID, train);
+      trainDB.erase_without_merge(train.trainID, train);
       for (int i = start_id; i < end_id; ++i) {
         current_date = add_days(order.date, train.leavedates[i] - train.leavedates[start_id]);
         train.seat_num[delta_date(current_date)][i] += order.num;
@@ -1114,9 +1197,21 @@ public:
         //     << "cur seat_num: " << train.seat_num[delta_date(current_date)][i] << endl;
       }
       trainDB.insert(train.trainID, train);
-      orderDB.erase(Key(username.c_str()), order);
+      orderDB.erase_without_merge(Key(username.c_str()), order);
       order.status = 2;
       orderDB.insert(Key(username.c_str()), order);
+      //      cout << "order insert" << endl;
+      //cout << order.trainID << " " 
+      //     << order.startStation << " " 
+      //     << order.date << " " 
+      //     << order.leavingTime << " -> "
+      //     << order.endStation << " "
+      //     << order.arriveDate << " "
+      //     << order.arrivingTime << " "
+      //     << order.price << " "
+      //     << order.num << " "
+      //     << order.ID
+      //     << endl;
 
       //检查pending_queue中是否有候补订单可以完成
       for (int i = 0; i < pending_queue.size(); ++i) {
@@ -1148,11 +1243,23 @@ public:
             }
           }
           if (flag) {
-            orderDB.erase(Key(username.c_str()), pending_order);
+            orderDB.erase_without_merge(Key(pending_order.userID), pending_order);
             pending_order.status = 0;
-            orderDB.insert(Key(username.c_str()), pending_order);
+            orderDB.insert(Key(pending_order.userID), pending_order);
+            //cout << "order insert" << endl;
+            //cout << pending_order.trainID << " " 
+            //     << pending_order.startStation << " " 
+            //     << pending_order.date << " " 
+            //     << pending_order.leavingTime << " -> "
+            //     << pending_order.endStation << " "
+            //     << pending_order.arriveDate << " "
+            //     << pending_order.arrivingTime << " "
+            //     << pending_order.price << " "
+            //     << pending_order.num << " "
+            //     << pending_order.ID
+            //     << endl;
             current_date1 = pending_order.date;
-            trainDB.erase(Key(pending_order.trainID), train);
+            trainDB.erase_without_merge(Key(pending_order.trainID), train);
             for (int j = start_id1; j < end_id1; ++j) {
               current_date1 = add_days(pending_order.date, train.leavedates[j] - train.leavedates[start_id1]);
               train.seat_num[delta_date(current_date1)][j] -= pending_order.num;
@@ -1163,8 +1270,6 @@ public:
             }
             trainDB.insert(Key(pending_order.trainID), train);
             pending_queue.modify(i, pending_order);
-            cout << 0 << endl;
-            return;
           }
         }
       }

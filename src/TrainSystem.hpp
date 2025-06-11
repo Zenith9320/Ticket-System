@@ -843,10 +843,6 @@ public:
     Date arrive_date = date, mid_date = date, mid_date1 = date;
     auto beg_train = station_train_map.find_all(Key(start_station.c_str()));
     auto end_train = station_train_map.find_all(Key(end_station.c_str()));
-    sjtu::map<TrainID, bool> end_trains;
-    for (int it = 0; it < end_train.size(); it++) {
-      end_trains.insert({end_train[it], true});
-    }
     if (beg_train.empty()) {
       //cout << "no train from the beg station" << endl;
       cout << 0 << endl;
@@ -895,7 +891,7 @@ public:
           if (mid_train.empty()) continue;
           for (int it2 = 0; it2 < mid_train.size(); ++it2) {//枚举第二列车
             string trainB_id = mid_train[it2].trainID;
-            if (end_trains.find(trainB_id.c_str()) == end_trains.end()) continue;
+            if (!binarySearch(end_train, trainB_id)) continue;
             if (trainB_id == trainA_id) continue;
             auto x = trainDB.find_all(Key(trainB_id.c_str()));
             if (x.empty()) continue;

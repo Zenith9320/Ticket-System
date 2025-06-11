@@ -142,6 +142,22 @@ int delta_date(Date& input) {
   return days;
 }
 
+bool binarySearch(const sjtu::vector<TrainID>& vec, TrainID target) {
+  int left = 0;
+  int right = vec.size() - 1;
+  while (left <= right) {
+    int mid = left + (right - left) / 2; 
+    if (vec[mid] == target) {
+      return true;
+    } else if (vec[mid] < target) {
+      left = mid + 1;
+    } else {
+      right = mid - 1;
+    }
+  }
+  return false;
+}
+
 struct Train {
   char trainID[ID_len + 1];
   int stationNum;
@@ -699,9 +715,11 @@ public:
     if (type == 0) {
       sjtu::map<brief_train_info, bool, CompByPrice> result_map;
       auto start_train = station_train_map.find_all(Key(start_station.c_str()));
+      auto end_train = station_train_map.find_all(Key(end_station.c_str()));
       for (int i = 0; i < start_train.size(); ++i) {
         int start_id = -1, end_id = -1;
         string trainID = start_train[i].trainID;
+        if (!binarySearch(end_train, trainID)) continue;
         //cout << "checking train: " << trainID << endl;
         auto x = trainDB.find_all(Key(trainID.c_str()));
         if (x.empty()) {

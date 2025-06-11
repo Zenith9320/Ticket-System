@@ -563,6 +563,22 @@ int binarySearch(const sjtu::vector<ID_pos>& vec, TrainID target) {//从vec中�
   return -1;
 }
 
+bool if_find(const sjtu::vector<ID_pos>& vec, TrainID target) {
+  int left = 0;
+  int right = vec.size() - 1;
+  while (left <= right) {
+    int mid = left + (right - left) / 2; 
+    if (vec[mid].trainID == target) {
+      return true;
+    } else if (vec[mid].trainID < target) {
+      left = mid + 1;
+    } else {
+      right = mid - 1;
+    }
+  }
+  return false;
+}
+
 class TrainSystem {
 private:
   BPlusTree<Train, 100, 10> trainDB;
@@ -607,7 +623,8 @@ public:
       newTrain.stations[i][station_name_len] = '\0';
       TrainID tempValue = TrainID(newTrain.trainID);
       ID_pos tempv = ID_pos(tempValue, i);
-      station_train_map.insert(Key(newTrain.stations[i]), tempv);
+      station_train_map.insert(Key(stations[i].c_str()), tempv);
+      //cout << "insert: " << stations[i] << " " << tempValue.trainID << " " << i << endl;
       //cout << "insert station_train_map: " << newTrain.stations[i] 
       //     << " -> " << newTrain.trainID << endl;
     }
@@ -739,6 +756,10 @@ public:
       sjtu::map<brief_train_info, bool, CompByPrice> result_map;
       auto start_train = station_train_map.find_all(Key(start_station.c_str()));
       auto end_train = station_train_map.find_all(Key(end_station.c_str()));
+      if (start_train.size() == 0 || end_train.size() == 0) {
+        cout << 0 << endl;
+        return;
+      }
       for (int i = 0; i < start_train.size(); ++i) {
         int start_id = -1, end_id = -1;
         string trainID = start_train[i].trainID.trainID;
@@ -750,8 +771,9 @@ public:
           continue;
         }
         Train train = x[0];
+        if (!train.if_release) continue;
         end_id = binarySearch(end_train, start_train[i].trainID);
-        if (start_id == -1 || end_id == -1 || start_id >= end_id) {
+        if (start_id == -1 || end_id == -1 || start_id >= end_id || train.stations[start_id] != start_station || train.stations[end_id] != end_station) {
           //cout << "didn't find end station" << endl;
           continue;
         }
@@ -792,6 +814,10 @@ public:
       sjtu::map<brief_train_info, bool, CompByTime> result_map;
       auto start_train = station_train_map.find_all(Key(start_station.c_str()));
       auto end_train = station_train_map.find_all(Key(end_station.c_str()));
+      if (start_train.size() == 0 || end_train.size() == 0) {
+        cout << 0 << endl;
+        return;
+      }
       for (int i = 0; i < start_train.size(); ++i) {
         int start_id = -1, end_id = -1;
         string trainID = start_train[i].trainID.trainID;
@@ -803,8 +829,9 @@ public:
           continue;
         }
         Train train = x[0];
+        if (!train.if_release) continue;
         end_id = binarySearch(end_train, start_train[i].trainID);
-        if (start_id == -1 || end_id == -1 || start_id >= end_id) {
+        if (start_id == -1 || end_id == -1 || start_id >= end_id || train.stations[start_id] != start_station || train.stations[end_id] != end_station) {
           //cout << "didn't find end station" << endl;
           continue;
         }
@@ -852,6 +879,11 @@ public:
     Date arrive_date = date, mid_date = date, mid_date1 = date;
     auto beg_train = station_train_map.find_all(Key(start_station.c_str()));
     auto end_train = station_train_map.find_all(Key(end_station.c_str()));
+    //cout << "end station: " << end_station << endl;
+    //  for (int i = 0; i < end_train.size(); i++) {
+    //    cout << "end_train: " << endl;
+    //    cout << end_train[i].trainID.trainID << endl;
+    //  }
     if (beg_train.empty()) {
       //cout << "no train from the beg station" << endl;
       cout << 0 << endl;
@@ -866,10 +898,12 @@ public:
         continue;
       }
       Train A = x[0];
+      if (!A.if_release) continue;
       //cout << "checking the first train: " << trainA_id << endl;
       Time depA = A.startTime;
       int startID = beg_train[xx].pos;
-      for (int i = startID; i <= startID; ++i) {//寻找起始站i
+      if (A.stations[startID] != start_station) continue;
+      for (int i = startID; i <= startID; ++i) {
         if (strcmp(A.stations[i], start_station.c_str()) != 0) continue;
         Date min_arrive_date_A = add_days(A.saleDate.startTime, A.leavedates[i]);//起始站i的最早出发日期
         Date max_arrive_date_A = add_days(A.saleDate.endTime, A.leavedates[i]);//起始站i的最晚出发日期
@@ -882,6 +916,7 @@ public:
         add_time(temp, A_leave_time, A.arrivetimes[i] + A.stopoverTimes[i]);
 
         for (int mid = i + 1; mid < A.stationNum; ++mid) {//枚举中转站mid
+          if (A.stations[mid] == end_station) continue;
           Date temp;
           depA = A.startTime;
           add_time(temp, depA, A.arrivetimes[mid]);
@@ -901,7 +936,7 @@ public:
           if (mid_train.empty()) continue;
           for (int it2 = 0; it2 < mid_train.size(); ++it2) {//枚举第二列车
             string trainB_id = mid_train[it2].trainID.trainID;
-            if (!binarySearch(end_train, TrainID(trainB_id.c_str()))) continue;
+            if (!if_find(end_train, mid_train[it2].trainID)) continue;
             if (trainB_id == trainA_id) continue;
             auto x = trainDB.find_all(Key(trainB_id.c_str()));
             if (x.empty()) continue;
@@ -909,11 +944,15 @@ public:
             if (!B.if_release) continue;
             //cout << "checking the second train: " << B.trainID << endl;
             int j = -1, end_j = -1;
-            for (int t = 0; t < B.stationNum; ++t) {//锁定起始站
-              if (strcmp(B.stations[t], A.stations[mid]) == 0) j = t;
-              if (strcmp(B.stations[t], end_station.c_str()) == 0) end_j = t;
+            j = binarySearch(mid_train, B.trainID);
+            end_j = binarySearch(end_train, B.trainID);
+            if (j == -1 || end_j == -1 || j >= end_j) {
+              //cout << "j : " << j << "end_j: " << end_j << endl;
+              //cout << "B.stations[j] : " << B.stations[j] << " A.stations[mid] : " << A.stations[mid] << endl;
+              //cout << "B.stations[end_j] : " << B.stations[end_j] << " end_station : " << end_station << endl;
+              //cout << "station_id error" << endl;
+              continue;
             }
-            if (j < 0 || end_j < 0 || j >= end_j) continue;
             Time B_leave_time = B.startTime;
             Date temp;
             add_time(temp, B_leave_time, B.arrivetimes[j] + B.stopoverTimes[j]);
@@ -948,7 +987,10 @@ public:
               current = add_days(leave_date, B.leavedates[t] - B.leavedates[j]);
               seatB = std::min(seatB, B.seat_num[delta_date(current)][t]);
             }
-            if (seatB <= 0) continue;
+            if (seatB <= 0) {
+              //cout << "no seat" << endl;
+              continue;
+            }
             
             int total_price = priceA + priceB;
             int delta_time_trans = 0;//计算换乘等待时间

@@ -525,28 +525,49 @@ struct TrainID {
     return strcmp(trainID, other.trainID) == 0;
   }
 };
+struct ID_pos {
+  TrainID trainID;
+  int pos;
+  ID_pos() = default;
+  ID_pos(TrainID ti, int p) : trainID(ti), pos(p) {};
+  bool operator <(const ID_pos& other) const {
+    return strcmp(trainID.trainID, other.trainID.trainID) < 0;
+  }
+  bool operator >(const ID_pos& other) const {
+    return strcmp(trainID.trainID, other.trainID.trainID) > 0;
+  }
+  bool operator >=(const ID_pos& other) const {
+    return strcmp(trainID.trainID, other.trainID.trainID) >= 0;
+  }
+  bool operator <=(const ID_pos& other) const {
+    return strcmp(trainID.trainID, other.trainID.trainID) <= 0;
+  }
+  bool operator ==(const ID_pos& other) const {
+    return strcmp(trainID.trainID, other.trainID.trainID) == 0;
+  }
+};
 
-bool binarySearch(const sjtu::vector<TrainID>& vec, TrainID target) {
+int binarySearch(const sjtu::vector<ID_pos>& vec, TrainID target) {//从vec中找到这个站是target列车的第几站
   int left = 0;
   int right = vec.size() - 1;
   while (left <= right) {
     int mid = left + (right - left) / 2; 
-    if (vec[mid] == target) {
-      return true;
-    } else if (vec[mid] < target) {
+    if (vec[mid].trainID == target) {
+      return vec[mid].pos;
+    } else if (vec[mid].trainID < target) {
       left = mid + 1;
     } else {
       right = mid - 1;
     }
   }
-  return false;
+  return -1;
 }
 
 class TrainSystem {
 private:
   BPlusTree<Train, 100, 10> trainDB;
   BPlusTree<Order, 1000, 10> orderDB; 
-  BPlusTree<TrainID, 100, 10> station_train_map;
+  BPlusTree<ID_pos, 100, 10> station_train_map;
   Vector<Order> pending_queue;
   string timestamp_file = "timestamp";
 
@@ -585,7 +606,8 @@ public:
       strncpy(newTrain.stations[i], stations[i].c_str(), station_name_len);
       newTrain.stations[i][station_name_len] = '\0';
       TrainID tempValue = TrainID(newTrain.trainID);
-      station_train_map.insert(Key(newTrain.stations[i]), tempValue);
+      ID_pos tempv = ID_pos(tempValue, i);
+      station_train_map.insert(Key(newTrain.stations[i]), tempv);
       //cout << "insert station_train_map: " << newTrain.stations[i] 
       //     << " -> " << newTrain.trainID << endl;
     }
@@ -667,7 +689,7 @@ public:
     if (train.if_release) return -1;
     trainDB.erase(key, train);
     for (int i = 0; i < train.stationNum; ++i) {
-      station_train_map.erase(Key(train.stations[i]), TrainID(train.trainID));
+      station_train_map.erase(Key(train.stations[i]), ID_pos(TrainID(train.trainID), i));
     }
     return 0;
   }
@@ -719,8 +741,8 @@ public:
       auto end_train = station_train_map.find_all(Key(end_station.c_str()));
       for (int i = 0; i < start_train.size(); ++i) {
         int start_id = -1, end_id = -1;
-        string trainID = start_train[i].trainID;
-        if (!binarySearch(end_train, TrainID(trainID.c_str()))) continue;
+        string trainID = start_train[i].trainID.trainID;
+        start_id = start_train[i].pos;
         //cout << "checking train: " << trainID << endl;
         auto x = trainDB.find_all(Key(trainID.c_str()));
         if (x.empty()) {
@@ -728,15 +750,7 @@ public:
           continue;
         }
         Train train = x[0];
-        if (!train.if_release) continue;
-        for (int i = 0; i < train.stationNum; ++i) {
-          if (strcmp(train.stations[i], start_station.c_str()) == 0) {
-            start_id = i;
-          }
-          if (strcmp(train.stations[i], end_station.c_str()) == 0) {
-            end_id = i;
-          }
-        }
+        end_id = binarySearch(end_train, start_train[i].trainID);
         if (start_id == -1 || end_id == -1 || start_id >= end_id) {
           //cout << "didn't find end station" << endl;
           continue;
@@ -777,9 +791,11 @@ public:
     } else if (type == 1) {
       sjtu::map<brief_train_info, bool, CompByTime> result_map;
       auto start_train = station_train_map.find_all(Key(start_station.c_str()));
+      auto end_train = station_train_map.find_all(Key(end_station.c_str()));
       for (int i = 0; i < start_train.size(); ++i) {
         int start_id = -1, end_id = -1;
-        string trainID = start_train[i].trainID;
+        string trainID = start_train[i].trainID.trainID;
+        start_id = start_train[i].pos;
         //cout << "checking train: " << trainID << endl;
         auto x = trainDB.find_all(Key(trainID.c_str()));
         if (x.empty()) {
@@ -787,15 +803,7 @@ public:
           continue;
         }
         Train train = x[0];
-        if (!train.if_release) continue;
-        for (int i = 0; i < train.stationNum; ++i) {
-          if (strcmp(train.stations[i], start_station.c_str()) == 0) {
-            start_id = i;
-          }
-          if (strcmp(train.stations[i], end_station.c_str()) == 0) {
-            end_id = i;
-          }
-        }
+        end_id = binarySearch(end_train, start_train[i].trainID);
         if (start_id == -1 || end_id == -1 || start_id >= end_id) {
           //cout << "didn't find end station" << endl;
           continue;
@@ -851,7 +859,7 @@ public:
     }
     bool if_found = false;
     for (int xx = 0; xx < beg_train.size(); ++xx) {
-      string trainA_id = beg_train[xx].trainID;
+      string trainA_id = beg_train[xx].trainID.trainID;
       auto x = trainDB.find_all(Key(trainA_id.c_str()));
       if (x.empty()) {
         //cout << "train not found in trainDB" << endl;
@@ -860,7 +868,8 @@ public:
       Train A = x[0];
       //cout << "checking the first train: " << trainA_id << endl;
       Time depA = A.startTime;
-      for (int i = 0; i + 1 < A.stationNum; ++i) {//寻找起始站i
+      int startID = beg_train[xx].pos;
+      for (int i = startID; i <= startID; ++i) {//寻找起始站i
         if (strcmp(A.stations[i], start_station.c_str()) != 0) continue;
         Date min_arrive_date_A = add_days(A.saleDate.startTime, A.leavedates[i]);//起始站i的最早出发日期
         Date max_arrive_date_A = add_days(A.saleDate.endTime, A.leavedates[i]);//起始站i的最晚出发日期
@@ -891,7 +900,7 @@ public:
           auto mid_train = station_train_map.find_all(Key(A.stations[mid]));
           if (mid_train.empty()) continue;
           for (int it2 = 0; it2 < mid_train.size(); ++it2) {//枚举第二列车
-            string trainB_id = mid_train[it2].trainID;
+            string trainB_id = mid_train[it2].trainID.trainID;
             if (!binarySearch(end_train, TrainID(trainB_id.c_str()))) continue;
             if (trainB_id == trainA_id) continue;
             auto x = trainDB.find_all(Key(trainB_id.c_str()));

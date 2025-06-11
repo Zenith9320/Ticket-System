@@ -527,9 +527,9 @@ struct TrainID {
 
 class TrainSystem {
 private:
-  BPlusTree<Train, 100, 30> trainDB;
-  BPlusTree<Order, 100, 30> orderDB; 
-  BPlusTree<TrainID, 100, 30> station_train_map;
+  BPlusTree<Train, 100, 20> trainDB;
+  BPlusTree<Order, 100, 20> orderDB; 
+  BPlusTree<TrainID, 100, 20> station_train_map;
   Vector<Order> pending_queue;
   string timestamp_file = "timestamp";
 

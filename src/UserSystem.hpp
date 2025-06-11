@@ -79,7 +79,7 @@ struct account {
 
 class UserSystem {
 private:
-  BPlusTree<account, 100, 10> userDB;
+  BPlusTree<account, 100, 20> userDB;
   int user_num = 0;
   sjtu::map<string, int> login_users;
 public:

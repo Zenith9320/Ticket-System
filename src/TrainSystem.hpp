@@ -142,21 +142,6 @@ int delta_date(Date& input) {
   return days;
 }
 
-bool binarySearch(const sjtu::vector<TrainID>& vec, TrainID target) {
-  int left = 0;
-  int right = vec.size() - 1;
-  while (left <= right) {
-    int mid = left + (right - left) / 2; 
-    if (vec[mid] == target) {
-      return true;
-    } else if (vec[mid] < target) {
-      left = mid + 1;
-    } else {
-      right = mid - 1;
-    }
-  }
-  return false;
-}
 
 struct Train {
   char trainID[ID_len + 1];
@@ -541,6 +526,22 @@ struct TrainID {
   }
 };
 
+bool binarySearch(const sjtu::vector<TrainID>& vec, TrainID target) {
+  int left = 0;
+  int right = vec.size() - 1;
+  while (left <= right) {
+    int mid = left + (right - left) / 2; 
+    if (vec[mid] == target) {
+      return true;
+    } else if (vec[mid] < target) {
+      left = mid + 1;
+    } else {
+      right = mid - 1;
+    }
+  }
+  return false;
+}
+
 class TrainSystem {
 private:
   BPlusTree<Train, 100, 10> trainDB;
@@ -719,7 +720,7 @@ public:
       for (int i = 0; i < start_train.size(); ++i) {
         int start_id = -1, end_id = -1;
         string trainID = start_train[i].trainID;
-        if (!binarySearch(end_train, trainID)) continue;
+        if (!binarySearch(end_train, TrainID(trainID.c_str()))) continue;
         //cout << "checking train: " << trainID << endl;
         auto x = trainDB.find_all(Key(trainID.c_str()));
         if (x.empty()) {
@@ -891,7 +892,7 @@ public:
           if (mid_train.empty()) continue;
           for (int it2 = 0; it2 < mid_train.size(); ++it2) {//枚举第二列车
             string trainB_id = mid_train[it2].trainID;
-            if (!binarySearch(end_train, trainB_id)) continue;
+            if (!binarySearch(end_train, TrainID(trainB_id.c_str()))) continue;
             if (trainB_id == trainA_id) continue;
             auto x = trainDB.find_all(Key(trainB_id.c_str()));
             if (x.empty()) continue;

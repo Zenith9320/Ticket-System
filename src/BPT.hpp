@@ -234,10 +234,14 @@ private:
     }
     cache.erase(cache.find(old->node.offset));
     if (old->prev) {
-      lru_tail = old->prev;
-      lru_tail->next = nullptr;
+      old->prev->next = old->next;
     } else {
-      lru_head = lru_tail = nullptr;
+      lru_head = old->next;
+    }
+    if (old->next) {
+      old->next->prev = old->prev;
+    } else {
+      lru_tail = old->prev;
     }
     delete old;
   }
@@ -259,13 +263,14 @@ private:
   }
 
   void cachewrite(IndexNode<T, SIZE>& node) {
-    IndexFile.writeT(node, node.offset);
     auto it = cache.find(node.offset);
     if (it != cache.end()) {
       CacheEntry* ce = it->second;
       ce->node = node;
-      ce->dirty = false;
+      ce->dirty = true;
       moveToHead(ce);
+    } else {
+      IndexFile.writeT(node, node.offset);
     }
   }
 
@@ -289,12 +294,32 @@ private:
   /*****IndexFile的读取和写入*****/
   //在index位置读取一个Node
   IndexNode<T, SIZE> readNode(int index) {
-    return cacheread(index);
+    auto it = cache.find(index);
+    if (it != cache.end()) {
+      CacheEntry* ce = it->second;
+      moveToHead(ce);
+      return ce->node;
+    }
+    IndexNode<T, SIZE> node;
+    IndexFile.read(node, index);
+    if ((int)cache.size() >= cache_size) evictLRU();
+    CacheEntry* ce = new CacheEntry(node);
+    cache[index] = ce;
+    addToHead(ce);
+    return node;
   }
 
   //在合适位置写入一个Node
-  void writeNode(IndexNode<T, SIZE>& target) {
-    cachewrite(target);
+  void writeNode(IndexNode<T, SIZE>& node) {
+    auto it = cache.find(node.offset);
+    if (it != cache.end()) {
+      CacheEntry* ce = it->second;
+      ce->node = node;
+      ce->dirty = true;
+      moveToHead(ce);
+    } else {
+      IndexFile.writeT(node, node.offset);
+    }
   }
 
   /*****split操作*****/
@@ -447,6 +472,7 @@ private:
   /*****merge操作*****/
   void mergeLeaf(IndexNode<T, SIZE>& node) {
     if (node.parent == -1) return;
+    //cout << "parent node offsert = " << node.parent << endl;
     IndexNode<T, SIZE> parent_node = readNode(node.parent);
     int index = -1;
     for (int i = 0; i <= parent_node.kv_num; ++i) {
@@ -732,10 +758,19 @@ public:
   ~BPlusTree() {
     CacheEntry* cur = lru_head;
     while (cur) {
-      CacheEntry* nxt = cur->next;
-      delete cur;
-      cur = nxt;
+      if (cur->dirty) {
+        IndexFile.writeT(cur->node, cur->node.offset);
+        cur->dirty = false;
+      }
+      cur = cur->next;
     }
+    cur = lru_head;
+    while (cur) {
+        CacheEntry* next = cur->next;
+        delete cur;
+        cur = next;
+    }
+    lru_head = lru_tail = nullptr;
   };
 
   //向BPT中插入key_value键值对

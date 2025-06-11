@@ -220,13 +220,15 @@ struct brief_transfer_info {
   int seat_num_B = -1;
   Time arriveTime_A;
   Time arriveTime_B;
+  int total_time = 0;
 
   brief_transfer_info() = default;
   brief_transfer_info(const char* id_A, Time sts_A, int t_A, int p_A, int s_A,
                       const char* id_B, Time sts_B, int t_B, int p_B, int s_B,
-                      Time arv_A, Time arv_B)
+                      Time arv_A, Time arv_B, int tt)
   : startTime_A(sts_A), time_A(t_A), price_A(p_A), seat_num_A(s_A),
-    startTime_B(sts_B), time_B(t_B), price_B(p_B), seat_num_B(s_B), arriveTime_A(arv_A), arriveTime_B(arv_B) {
+    startTime_B(sts_B), time_B(t_B), price_B(p_B), seat_num_B(s_B), 
+    arriveTime_A(arv_A), arriveTime_B(arv_B), total_time(tt) {
     strncpy(trainID_A, id_A, ID_len);
     trainID_A[ID_len] = '\0';
     strncpy(trainID_B, id_B, ID_len);
@@ -250,8 +252,8 @@ struct CompByPrice {
 
 struct TransCompByTime {
   bool operator()(const brief_transfer_info& a, const brief_transfer_info& b) const {
-    if (a.time_A + a.time_B != b.time_A + b.time_B) {
-      return a.time_A + a.time_B < b.time_A + b.time_B;
+    if (a.total_time != b.total_time) {
+      return a.total_time < b.total_time;
     }
     if (a.price_A + a.price_B != b.price_A + b.price_B) {
       return a.price_A + a.price_B < b.price_A + b.price_B;
@@ -268,8 +270,8 @@ struct TransCompByPrice {
     if (a.price_A + a.price_B != b.price_A + b.price_B) {
       return a.price_A + a.price_B < b.price_A + b.price_B;
     }
-    if (a.time_A + a.time_B != b.time_A + b.time_B) {
-      return a.time_A + a.time_B < b.time_A + b.time_B;
+    if (a.total_time != b.total_time) {
+      return a.total_time < b.total_time;
     }
     if (strcmp(a.trainID_A, b.trainID_A) != 0) {
       return strcmp(a.trainID_A, b.trainID_A) < 0;
@@ -371,7 +373,6 @@ bool check_train(const Train& train) {
   if (!check_stations(train.stations, train.stationNum)) return false;
   if (!check_seatNum(train.seatNum)) return false;
   if (!check_prices(train.prices, train.stationNum)) return false;
-  if (!check_startTime(train.startTime)) return false;
   if (!check_travelTimes(train.travelTimes, train.stationNum)) return false;
   if (!check_stopoverTimes(train.stopoverTimes, train.stationNum)) return false;
   if (!check_saleDate(train.saleDate)) return false;
@@ -427,6 +428,22 @@ int delta_time(Time& start_time, Time& end_time) {//计算从start_time到end_ti
   int start_total_minutes = start_time.hour * 60 + start_time.minute;
   int end_total_minutes = end_time.hour * 60 + end_time.minute;
   return end_total_minutes - start_total_minutes;
+}
+
+
+int get_time(Date& beg_date, Time& beg_time, Date& end_date, Time& end_time) {
+  int delta_days = 0;
+  Date temp = beg_date;
+  while (temp != end_date) {
+    temp = temp + Date(0, 1);
+    delta_days++;
+  }
+  int ans = 0;
+  if (beg_time <= end_time) {
+    return delta_days * 1440 + delta_time(beg_time, end_time);
+  } else {
+    return delta_days * 1440 - delta_time(end_time, beg_time);
+  }
 }
 
 struct Order {
@@ -907,17 +924,19 @@ public:
             int total_price = priceA + priceB;
             int delta_time_trans = 0;//计算换乘等待时间
             if (depB < depA) {
-              delta_time_trans = 1440 * (delta_date1 + 1) - delta_time(depB, depA);
+              delta_time_trans = 1440 * delta_date1 - delta_time(depB, depA);
             } else {
-              delta_time_trans = delta_time(depA, depB);
+              delta_time_trans = 1440 * delta_date1 + delta_time(depA, depB);
             }
             int total_duration = durationA + durationB + delta_time_trans;
             int total_seat = std::min(seatA, seatB);
             // 用 A.startTime 作排序基准
             Date temp1;
             add_time(temp1, depB, B.arrivetimes[end_j] - B.arrivetimes[j] - B.stopoverTimes[j]);
+            Date t = add_days(leave_date, B.dates[end_j] - B.leavedates[j]);
+            int tt = get_time(date, A.startTime, t, depB);
             brief_transfer_info info(trainA_id.c_str(), A_leave_time, durationA, priceA, seatA,
-                                  trainB_id.c_str(), B_leave_time, durationB, priceB, seatB, depA, depB);
+                                  trainB_id.c_str(), B_leave_time, durationB, priceB, seatB, depA, depB, tt);
             if (info.price_A == -1 || info.price_B == -1 || info.seat_num_A == -1 || info.seat_num_B == -1) continue;
             if (!if_found) {
               result = info;
